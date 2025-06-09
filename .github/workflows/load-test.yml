@@ -1,0 +1,69 @@
+name: Load Testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Target URL for load testing'
+        required: true
+        default: 'http://localhost:8000'
+      test_duration:
+        description: 'Test duration (e.g., 5m, 10m)'
+        required: true
+        default: '5m'
+      concurrent_users:
+        description: 'Number of concurrent users'
+        required: true
+        default: '20'
+  schedule:
+    - cron: '0 3 * * 1'  # Weekly on Monday at 3 AM
+
+jobs:
+  load-test:
+    name: Load Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
+      run: |
+        pip install locust
+        npm install -g artillery@latest
+        
+    - name: Health check target
+      run: |
+        TARGET_URL="${{ github.event.inputs.target_url || 'http://localhost:8000' }}"
+        curl -f "$TARGET_URL/health" || echo "Target not accessible"
+        
+    - name: Run Locust load test
+      run: |
+        cd tests/load
+        chmod +x run_load_tests.sh
+        ./run_load_tests.sh -t locust \
+          -h "${{ github.event.inputs.target_url || 'http://localhost:8000' }}" \
+          -u "${{ github.event.inputs.concurrent_users || '20' }}" \
+          -d "${{ github.event.inputs.test_duration || '5m' }}"
+          
+    - name: Run Artillery load test
+      run: |
+        cd tests/load
+        ./run_load_tests.sh -t artillery \
+          -h "${{ github.event.inputs.target_url || 'http://localhost:8000' }}" \
+          -d "${{ github.event.inputs.test_duration || '5m' }}"
+          
+    - name: Upload load test results
+      uses: actions/upload-artifact@v3
+      with:
+        name: load-test-results
+        path: tests/load/reports/

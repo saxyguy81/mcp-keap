@@ -1,0 +1,14 @@
+# Core Dependencies - Essential for MCP server
+httpx>=0.25.0
+python-dotenv>=1.0.0
+fastmcp>=0.2.0
+python-dateutil>=2.8.2
+pydantic>=2.0.0
+
+# Testing Dependencies  
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+
+# Development Dependencies
+ruff>=0.1.0

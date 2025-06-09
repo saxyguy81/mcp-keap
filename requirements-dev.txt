@@ -1,0 +1,8 @@
+# Development Requirements
+# Include all core requirements plus essential development tools
+
+-r requirements.txt
+
+# Essential Development Tools
+pytest-xdist>=3.3.0
+coverage>=7.2.0

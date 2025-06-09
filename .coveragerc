@@ -1,0 +1,50 @@
+[run]
+source = src
+omit = 
+    src/__init__.py
+    tests/*
+    */test_*
+    *test*.py
+    */__pycache__/*
+    */migrations/*
+    */venv/*
+    */env/*
+    .venv/*
+    */virtualenv/*
+    */site-packages/*
+    setup.py
+    conftest.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    def __str__
+    if self.debug:
+    if settings.DEBUG
+    raise AssertionError
+    raise NotImplementedError
+    if 0:
+    if False:
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    class .*\bProtocol\):
+    @(abc\.)?abstractmethod
+    except ImportError
+    # Debug statements
+    import pdb
+    pdb.set_trace()
+
+show_missing = True
+skip_covered = False
+precision = 2
+
+[html]
+directory = htmlcov
+title = Keap MCP Server Test Coverage Report
+
+[xml]
+output = coverage.xml
+
+[json]
+output = coverage.json

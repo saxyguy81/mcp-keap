@@ -1,0 +1,113 @@
+name: Pre-commit Checks
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for better diffs
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov coverage pytest-asyncio ruff
+
+    - name: Check code formatting
+      run: |
+        ruff format --check src/ || (echo "❌ Code formatting issues found. Run 'ruff format src/' to fix." && exit 1)
+
+    - name: Run linting
+      run: |
+        ruff check src/ || (echo "❌ Linting issues found. Run 'ruff check src/ --fix' to auto-fix." && exit 1)
+
+    - name: Run quick tests
+      run: |
+        # Run a subset of fast tests first
+        python -m pytest tests/unit/test_*_utils.py -v --tb=short
+
+    - name: Check coverage on changed files
+      run: |
+        # Get list of changed Python files
+        CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep '\.py$' | grep '^src/' || echo "")
+        
+        if [ -n "$CHANGED_FILES" ]; then
+          echo "📝 Changed files: $CHANGED_FILES"
+          
+          # Run coverage on entire codebase but focus on changed files
+          python -m pytest tests/unit/ --cov=src --cov-report=term-missing
+          
+          # Extract coverage for specific files if possible
+          echo "🔍 Checking coverage for changed files..."
+          for file in $CHANGED_FILES; do
+            if [ -f "$file" ]; then
+              echo "  - $file"
+            fi
+          done
+        else
+          echo "📝 No Python source files changed"
+        fi
+
+    - name: Validate test structure
+      run: |
+        # Ensure all new Python files in src/ have corresponding tests
+        CHANGED_SRC_FILES=$(git diff --name-only HEAD~1 HEAD | grep '^src/.*\.py$' | grep -v '__init__.py' || echo "")
+        
+        for src_file in $CHANGED_SRC_FILES; do
+          if [ -f "$src_file" ]; then
+            # Extract module path for test file
+            module_path=$(echo "$src_file" | sed 's|^src/||' | sed 's|\.py$||' | sed 's|/|_|g')
+            test_file="tests/unit/test_${module_path}.py"
+            
+            if [ ! -f "$test_file" ]; then
+              echo "⚠️  Warning: No test file found for $src_file (expected: $test_file)"
+            else
+              echo "✅ Test file exists for $src_file"
+            fi
+          fi
+        done
+
+    - name: Security check
+      run: |
+        # Basic security checks
+        echo "🔒 Running basic security checks..."
+        
+        # Check for common security issues
+        if grep -r "password\s*=" src/ || \
+           grep -r "secret\s*=" src/ || \
+           grep -r "token\s*=" src/ || \
+           grep -r "api_key\s*=" src/; then
+          echo "❌ Potential hardcoded credentials found!"
+          exit 1
+        fi
+        
+        echo "✅ No obvious security issues found"
+
+    - name: Performance check
+      run: |
+        # Run a basic performance check
+        echo "⚡ Running performance checks..."
+        
+        # Check for potential performance issues in code
+        if grep -r "time\.sleep" src/ || \
+           grep -r "while True:" src/; then
+          echo "⚠️  Potential performance issues found (manual review needed)"
+        fi
+        
+        # Run quick performance test if it exists
+        if [ -f "tests/performance/quick_perf_test.py" ]; then
+          python -m pytest tests/performance/quick_perf_test.py -v
+        fi
+        
+        echo "✅ Performance checks completed"
