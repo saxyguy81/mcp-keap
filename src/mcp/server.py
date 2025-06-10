@@ -15,7 +15,9 @@ from src.mcp.tools import (
     search_contacts_by_email,
     search_contacts_by_name,
     get_tags,
-    get_contacts_with_tag
+    get_contacts_with_tag,
+    set_custom_field_values,
+    get_api_diagnostics
 )
 
 logger = logging.getLogger(__name__)
@@ -43,6 +45,8 @@ class KeapMCPServer:
         self.mcp.add_tool(search_contacts_by_name)
         self.mcp.add_tool(get_tags)
         self.mcp.add_tool(get_contacts_with_tag)
+        self.mcp.add_tool(set_custom_field_values)
+        self.mcp.add_tool(get_api_diagnostics)
     
     def _register_resources(self):
         """Register MCP resources"""

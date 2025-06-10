@@ -1,278 +1,293 @@
 """
-Tag-related MCP tools for Keap CRM integration.
+Tag-specific MCP tools for Keap CRM integration.
+
+This module provides tag-related operations including listing, filtering,
+and managing contact-tag relationships.
 """
 
-import time
 import logging
 from typing import Dict, List, Any, Optional
 
-from mcp.server.fastmcp import Context
-
 from src.api.client import KeapApiService
 from src.cache.manager import CacheManager
+from src.utils.contact_utils import format_contact_data, process_contact_include_fields
 
 logger = logging.getLogger(__name__)
 
 
 async def get_tags(
-    context: Context,
+    context,
     filters: Optional[List[Dict[str, Any]]] = None,
     include_categories: bool = True,
     limit: int = 1000
 ) -> List[Dict[str, Any]]:
-    """
-    Get tags from Keap CRM with optional filtering.
-    
-    Args:
-        context: MCP context
-        filters: List of filter conditions for tags
-        include_categories: Whether to include category information
-        limit: Maximum number of tags to return
-        
-    Returns:
-        List of tag records
-    """
-    start_time = time.time()
-    
+    """Get tags with optional filtering."""
     try:
-        # Get API client
-        api_client = getattr(context, 'api_client', KeapApiService())
+        api_client: KeapApiService = context.api_client
+        cache_manager: CacheManager = context.cache_manager
         
-        # Get cache manager
-        cache_manager = getattr(context, 'cache_manager', CacheManager())
+        cache_key = f"get_tags:{hash(str(filters))}:{include_categories}:{limit}"
         
-        # Create cache key
-        cache_key = f"tags:{include_categories}:{limit}:{hash(str(filters))}"
-        cached_tags = await cache_manager.get(cache_key)
+        # Check cache
+        cached_result = await cache_manager.get(cache_key)
+        if cached_result:
+            logger.debug(f"Cache hit for get_tags: {cache_key}")
+            return cached_result
         
-        if cached_tags:
-            logger.info(f"Retrieved {len(cached_tags)} tags from cache")
-            return cached_tags
-        
-        # Fetch tags from API
+        # Get tags from API
         response = await api_client.get_tags(limit=limit)
         tags = response.get('tags', [])
         
-        # Apply filters if specified
+        # Apply filters if provided
         if filters:
-            tags = _apply_tag_filters(tags, filters)
+            filtered_tags = []
+            for tag in tags:
+                include_tag = True
+                
+                for filter_condition in filters:
+                    field = filter_condition.get('field')
+                    value = filter_condition.get('value')
+                    operator = filter_condition.get('operator', 'equals')
+                    
+                    if field and value:
+                        tag_value = tag.get(field)
+                        if not tag_value:
+                            include_tag = False
+                            break
+                            
+                        if operator == 'contains':
+                            if value.lower() not in str(tag_value).lower():
+                                include_tag = False
+                                break
+                        elif operator == 'equals':
+                            if str(tag_value).lower() != str(value).lower():
+                                include_tag = False
+                                break
+                
+                if include_tag:
+                    filtered_tags.append(tag)
+            
+            tags = filtered_tags
         
-        # Enhance with category information if requested
-        if include_categories:
-            tags = await _enhance_tags_with_categories(api_client, tags)
+        # Format tags
+        formatted_tags = []
+        for tag in tags:
+            formatted_tag = {
+                'id': tag.get('id'),
+                'name': tag.get('name'),
+                'description': tag.get('description')
+            }
+            
+            if include_categories and 'category' in tag:
+                formatted_tag['category'] = tag['category']
+            
+            formatted_tags.append(formatted_tag)
         
-        # Cache the result for 1 hour
-        await cache_manager.set(cache_key, tags, ttl=3600)
+        # Cache result
+        await cache_manager.set(cache_key, formatted_tags, ttl=3600)  # 1 hour
         
-        execution_time = time.time() - start_time
-        logger.info(f"Retrieved {len(tags)} tags in {execution_time:.2f}s")
-        
-        return tags
+        logger.info(f"Retrieved {len(formatted_tags)} tags")
+        return formatted_tags
         
     except Exception as e:
         logger.error(f"Error getting tags: {e}")
         raise
 
 
-async def get_tag_by_id(
-    context: Context,
-    tag_id: str,
-    include_category: bool = True
-) -> Dict[str, Any]:
-    """
-    Get a specific tag by ID.
-    
-    Args:
-        context: MCP context
-        tag_id: Tag ID to retrieve
-        include_category: Whether to include category information
-        
-    Returns:
-        Tag record
-    """
-    try:
-        # Get API client
-        api_client = getattr(context, 'api_client', KeapApiService())
-        
-        # Get cache manager  
-        cache_manager = getattr(context, 'cache_manager', CacheManager())
-        
-        # Check cache first
-        cache_key = f"tag:{tag_id}"
-        cached_tag = await cache_manager.get(cache_key)
-        
-        if cached_tag:
-            tag = cached_tag
-        else:
-            # Fetch from API
-            tag = await api_client.get_tag(tag_id)
-            
-            # Cache for 1 hour
-            await cache_manager.set(cache_key, tag, ttl=3600)
-        
-        # Enhance with category if requested
-        if include_category and 'category' not in tag:
-            tag = await _enhance_tags_with_categories(api_client, [tag])
-            tag = tag[0] if tag else {}
-        
-        return tag
-        
-    except Exception as e:
-        logger.error(f"Error getting tag {tag_id}: {e}")
-        raise
-
-
-async def search_tags(
-    context: Context,
-    search_term: str,
-    include_categories: bool = True
-) -> List[Dict[str, Any]]:
-    """
-    Search tags by name.
-    
-    Args:
-        context: MCP context
-        search_term: Term to search for in tag names
-        include_categories: Whether to include category information
-        
-    Returns:
-        List of matching tags
-    """
-    try:
-        # Create name filter
-        filters = [{
-            "field": "name",
-            "operator": "CONTAINS",
-            "value": search_term
-        }]
-        
-        return await get_tags(
-            context=context,
-            filters=filters,
-            include_categories=include_categories
-        )
-        
-    except Exception as e:
-        logger.error(f"Error searching tags for '{search_term}': {e}")
-        raise
-
-
 async def get_contacts_with_tag(
-    context: Context,
+    context,
     tag_id: str,
     limit: int = 200,
     include: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
-    """
-    Get all contacts that have a specific tag.
-    
-    Args:
-        context: MCP context
-        tag_id: Tag ID to search for
-        limit: Maximum number of contacts to return
-        include: Fields to include in contact response
-        
-    Returns:
-        List of contacts with the specified tag
-    """
+    """Get contacts that have a specific tag."""
     try:
-        # Import contact tools to avoid circular import
-        from src.mcp.contact_tools import list_contacts
+        api_client: KeapApiService = context.api_client
+        cache_manager: CacheManager = context.cache_manager
         
-        # Create tag filter
-        filters = [{
-            "field": "tags",
-            "operator": "CONTAINS",
-            "value": tag_id
-        }]
+        cache_key = f"contacts_with_tag:{tag_id}:{limit}:{hash(str(include))}"
         
-        return await list_contacts(
-            context=context,
-            filters=filters,
-            limit=limit,
-            include=include
-        )
+        # Check cache
+        cached_result = await cache_manager.get(cache_key)
+        if cached_result:
+            return cached_result
+        
+        # Get contacts with tag
+        contacts = await api_client.get_contacts_by_tag(tag_id, limit=limit)
+        
+        # Process include fields
+        if include:
+            contacts = [process_contact_include_fields(contact, include) for contact in contacts]
+        
+        # Format contacts
+        formatted_contacts = [format_contact_data(contact) for contact in contacts]
+        
+        # Cache result
+        await cache_manager.set(cache_key, formatted_contacts, ttl=1800)  # 30 minutes
+        
+        logger.info(f"Found {len(formatted_contacts)} contacts with tag {tag_id}")
+        return formatted_contacts
         
     except Exception as e:
-        logger.error(f"Error getting contacts with tag {tag_id}: {e}")
+        logger.error(f"Error getting contacts with tag: {e}")
         raise
 
 
-def _apply_tag_filters(tags: List[Dict[str, Any]], 
-                      filters: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Apply filters to tag list."""
-    filtered_tags = []
-    
-    for tag in tags:
-        include_tag = True
+async def get_tag_details(
+    context,
+    tag_id: str
+) -> Dict[str, Any]:
+    """Get detailed information about a specific tag."""
+    try:
+        api_client: KeapApiService = context.api_client
+        cache_manager: CacheManager = context.cache_manager
         
-        for filter_condition in filters:
-            field = filter_condition.get('field')
-            operator = filter_condition.get('operator')
-            value = filter_condition.get('value', '').lower()
-            
-            if field == 'name':
-                tag_name = tag.get('name', '').lower()
-                
-                if operator == 'CONTAINS':
-                    if value not in tag_name:
-                        include_tag = False
-                        break
-                elif operator == 'EQUALS':
-                    if value != tag_name:
-                        include_tag = False
-                        break
-                elif operator == 'STARTS_WITH':
-                    if not tag_name.startswith(value):
-                        include_tag = False
-                        break
-            
-            elif field == 'category':
-                category_name = tag.get('category', {}).get('name', '').lower()
-                
-                if operator == 'EQUALS':
-                    if value != category_name:
-                        include_tag = False
-                        break
-                elif operator == 'CONTAINS':
-                    if value not in category_name:
-                        include_tag = False
-                        break
+        cache_key = f"tag_details:{tag_id}"
         
-        if include_tag:
-            filtered_tags.append(tag)
-    
-    return filtered_tags
+        # Check cache
+        cached_result = await cache_manager.get(cache_key)
+        if cached_result:
+            return cached_result
+        
+        # Get tag details
+        tag = await api_client.get_tag(tag_id)
+        
+        # Format tag
+        formatted_tag = {
+            'id': tag.get('id'),
+            'name': tag.get('name'),
+            'description': tag.get('description')
+        }
+        
+        if 'category' in tag:
+            formatted_tag['category'] = tag['category']
+        
+        # Cache result
+        await cache_manager.set(cache_key, formatted_tag, ttl=3600)  # 1 hour
+        
+        logger.info(f"Retrieved details for tag: {tag_id}")
+        return formatted_tag
+        
+    except Exception as e:
+        logger.error(f"Error getting tag details: {e}")
+        raise
 
 
-async def _enhance_tags_with_categories(api_client: KeapApiService, 
-                                       tags: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Enhance tags with category information."""
-    # For now, return tags as-is since category info is typically included
-    # This can be enhanced to fetch additional category details if needed
-    return tags
+async def create_tag(
+    context,
+    name: str,
+    description: Optional[str] = None,
+    category_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """Create a new tag."""
+    try:
+        api_client: KeapApiService = context.api_client
+        
+        tag_data = {
+            'name': name
+        }
+        
+        if description:
+            tag_data['description'] = description
+        if category_id:
+            tag_data['category'] = {'id': category_id}
+        
+        # Create tag
+        new_tag = await api_client.create_tag(tag_data)
+        
+        logger.info(f"Created new tag: {name} (ID: {new_tag.get('id')})")
+        return new_tag
+        
+    except Exception as e:
+        logger.error(f"Error creating tag: {e}")
+        raise
 
 
-# MCP tool definitions for tag operations
-TAG_TOOLS = [
-    {
-        "name": "get_tags",
-        "description": "Get tags from Keap CRM with optional filtering",
-        "function": get_tags
-    },
-    {
-        "name": "get_tag_by_id",
-        "description": "Get a specific tag by ID", 
-        "function": get_tag_by_id
-    },
-    {
-        "name": "search_tags",
-        "description": "Search tags by name",
-        "function": search_tags
-    },
-    {
-        "name": "get_contacts_with_tag",
-        "description": "Get all contacts that have a specific tag",
-        "function": get_contacts_with_tag
-    }
-]
+async def apply_tags_to_contacts(
+    context,
+    tag_ids: List[str],
+    contact_ids: List[str]
+) -> Dict[str, Any]:
+    """Apply multiple tags to multiple contacts using batch operations."""
+    try:
+        api_client: KeapApiService = context.api_client
+        
+        # Use batch API if available
+        try:
+            await api_client.apply_tags_to_contacts(tag_ids, contact_ids)
+            success_count = len(contact_ids) * len(tag_ids)
+            
+            logger.info(f"Applied {len(tag_ids)} tags to {len(contact_ids)} contacts")
+            return {
+                'success': True,
+                'message': 'Successfully applied tags to contacts',
+                'operations_completed': success_count,
+                'tag_ids': tag_ids,
+                'contact_ids': contact_ids
+            }
+            
+        except ValueError:
+            # Fallback to individual operations for v1 API
+            success_count = 0
+            failed_operations = []
+            
+            for contact_id in contact_ids:
+                for tag_id in tag_ids:
+                    try:
+                        await api_client.apply_tag_to_contact(contact_id, tag_id)
+                        success_count += 1
+                    except Exception as e:
+                        failed_operations.append({
+                            'contact_id': contact_id,
+                            'tag_id': tag_id,
+                            'error': str(e)
+                        })
+            
+            logger.info(f"Applied tags individually: {success_count} successful, {len(failed_operations)} failed")
+            return {
+                'success': success_count > 0,
+                'message': f'Completed {success_count} operations',
+                'operations_completed': success_count,
+                'failed_operations': failed_operations
+            }
+        
+    except Exception as e:
+        logger.error(f"Error applying tags to contacts: {e}")
+        raise
+
+
+async def remove_tags_from_contacts(
+    context,
+    tag_ids: List[str],
+    contact_ids: List[str]
+) -> Dict[str, Any]:
+    """Remove multiple tags from multiple contacts."""
+    try:
+        api_client: KeapApiService = context.api_client
+        
+        success_count = 0
+        failed_operations = []
+        
+        for contact_id in contact_ids:
+            for tag_id in tag_ids:
+                try:
+                    await api_client.remove_tag_from_contact(contact_id, tag_id)
+                    success_count += 1
+                except Exception as e:
+                    failed_operations.append({
+                        'contact_id': contact_id,
+                        'tag_id': tag_id,
+                        'error': str(e)
+                    })
+        
+        logger.info(f"Removed tags: {success_count} successful, {len(failed_operations)} failed")
+        return {
+            'success': success_count > 0,
+            'message': f'Completed {success_count} operations',
+            'operations_completed': success_count,
+            'failed_operations': failed_operations
+        }
+        
+    except Exception as e:
+        logger.error(f"Error removing tags from contacts: {e}")
+        raise

@@ -137,3 +137,51 @@ def format_contact_summary(contact: Dict[str, Any]) -> Dict[str, Any]:
         "updated": contact.get('update_time'),
         "tag_count": len(get_tag_ids(contact))
     }
+
+
+def format_contact_data(contact: Dict[str, Any]) -> Dict[str, Any]:
+    """Format contact data for consistent output
+    
+    Args:
+        contact: Raw contact data from Keap API
+        
+    Returns:
+        Formatted contact data
+    """
+    if not contact:
+        return {}
+    
+    return {
+        'id': contact.get('id'),
+        'given_name': contact.get('given_name', ''),
+        'family_name': contact.get('family_name', ''),
+        'full_name': get_full_name(contact),
+        'email': get_primary_email(contact),
+        'email_addresses': contact.get('email_addresses', []),
+        'phone_numbers': contact.get('phone_numbers', []),
+        'addresses': contact.get('addresses', []),
+        'custom_fields': contact.get('custom_fields', []),
+        'tag_ids': get_tag_ids(contact),
+        'date_created': contact.get('date_created'),
+        'last_updated': contact.get('last_updated')
+    }
+
+
+def process_contact_include_fields(contact: Dict[str, Any], include_fields: List[str] = None) -> Dict[str, Any]:
+    """Process contact to include only specified fields
+    
+    Args:
+        contact: Contact data
+        include_fields: List of fields to include (if None, include all)
+        
+    Returns:
+        Filtered contact data
+    """
+    if not contact:
+        return {}
+    
+    if not include_fields:
+        return format_contact_data(contact)
+    
+    formatted = format_contact_data(contact)
+    return {field: formatted.get(field) for field in include_fields if field in formatted}

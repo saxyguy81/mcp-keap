@@ -1,23 +1,27 @@
 """
-Contact-related MCP tools for Keap CRM integration.
+Contact-specific MCP tools for Keap CRM integration.
+
+This module provides contact-related operations including listing, searching,
+and filtering contacts with comprehensive error handling.
 """
 
-import time
 import logging
 from typing import Dict, List, Any, Optional
 
-from mcp.server.fastmcp import Context
-
 from src.api.client import KeapApiService
 from src.cache.manager import CacheManager
-from src.utils.filters import FilterProcessor
-from src.schemas.definitions import ContactQueryRequest
+from src.utils.contact_utils import format_contact_data, process_contact_include_fields
+from src.utils.filter_utils import (
+    validate_filter_conditions, 
+    optimize_filters_for_api, 
+    apply_complex_filters
+)
 
 logger = logging.getLogger(__name__)
 
 
 async def list_contacts(
-    context: Context,
+    context,
     filters: Optional[List[Dict[str, Any]]] = None,
     limit: int = 200,
     offset: int = 0,
@@ -25,266 +29,194 @@ async def list_contacts(
     order_direction: str = "ASC",
     include: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
-    """
-    List contacts from Keap CRM with optional filtering and pagination.
-    
-    Args:
-        context: MCP context
-        filters: List of filter conditions
-        limit: Maximum number of contacts to return
-        offset: Number of contacts to skip
-        order_by: Field to order by
-        order_direction: ASC or DESC
-        include: Fields to include in response
-        
-    Returns:
-        List of contact records
-    """
-    start_time = time.time()
-    
+    """List contacts with optional filtering and pagination."""
     try:
-        # Get API client from context or create new one
-        api_client = getattr(context, 'api_client', None)
-        if not api_client:
-            api_client = KeapApiService()
+        api_client: KeapApiService = context.api_client
+        cache_manager: CacheManager = context.cache_manager
         
-        # Get cache manager
-        cache_manager = getattr(context, 'cache_manager', CacheManager())
-        
-        # Create query request
-        query_request = ContactQueryRequest(
-            filters=filters or [],
-            limit=limit,
-            offset=offset,
-            order_by=order_by,
-            order_direction=order_direction,
-            include=include
-        )
+        # Build cache key
+        cache_key = f"list_contacts:{hash(str(filters))}{limit}:{offset}:{order_by}:{order_direction}:{hash(str(include))}"
         
         # Check cache first
-        cache_key = f"contacts:{hash(str(query_request.dict()))}"
         cached_result = await cache_manager.get(cache_key)
-        
         if cached_result:
-            logger.info(f"Retrieved {len(cached_result)} contacts from cache")
+            logger.debug(f"Cache hit for list_contacts: {cache_key}")
             return cached_result
         
-        # Process filters if any
+        # Validate filters if provided
         if filters:
-            filter_processor = FilterProcessor()
-            contacts = await filter_processor.process_contact_filters(
-                api_client, filters, limit, offset
-            )
-        else:
-            # Simple query without filters
-            response = await api_client.get_contacts(
-                limit=limit,
-                offset=offset
-            )
-            contacts = response.get('contacts', [])
+            validate_filter_conditions(filters)
         
-        # Apply field selection if specified
-        if include:
-            contacts = _select_contact_fields(contacts, include)
+        # Optimize filters - separate server-side vs client-side
+        server_params, client_filters = optimize_filters_for_api(filters) if filters else ({}, [])
         
-        # Apply ordering if specified
+        # Build API parameters
+        params = {
+            'limit': limit,
+            'offset': offset,
+            **server_params  # Add optimized server-side parameters
+        }
+        
         if order_by:
-            contacts = _sort_contacts(contacts, order_by, order_direction)
+            params['order'] = f"{order_by}.{order_direction.upper()}"
         
-        # Cache the result
-        await cache_manager.set(cache_key, contacts, ttl=300)  # 5 minutes
+        # Get contacts from API (with server-side filtering applied)
+        response = await api_client.get_contacts(**params)
+        contacts = response.get('contacts', [])
         
-        execution_time = time.time() - start_time
-        logger.info(f"Retrieved {len(contacts)} contacts in {execution_time:.2f}s")
+        # Apply client-side filters for complex conditions
+        if client_filters:
+            logger.debug(f"Applying {len(client_filters)} client-side filters")
+            contacts = apply_complex_filters(contacts, client_filters)
         
-        return contacts
+        # Process include fields
+        if include:
+            contacts = [process_contact_include_fields(contact, include) for contact in contacts]
+        
+        # Format contact data
+        formatted_contacts = [format_contact_data(contact) for contact in contacts]
+        
+        # Cache result
+        await cache_manager.set(cache_key, formatted_contacts, ttl=1800)  # 30 minutes
+        
+        logger.info(f"Retrieved {len(formatted_contacts)} contacts")
+        return formatted_contacts
         
     except Exception as e:
         logger.error(f"Error listing contacts: {e}")
         raise
 
 
-async def get_contact_by_id(
-    context: Context,
-    contact_id: str,
-    include: Optional[List[str]] = None
-) -> Dict[str, Any]:
-    """
-    Get a specific contact by ID.
-    
-    Args:
-        context: MCP context
-        contact_id: Contact ID to retrieve
-        include: Fields to include in response
-        
-    Returns:
-        Contact record
-    """
-    try:
-        # Get API client
-        api_client = getattr(context, 'api_client', KeapApiService())
-        
-        # Get cache manager
-        cache_manager = getattr(context, 'cache_manager', CacheManager())
-        
-        # Check cache first
-        cache_key = f"contact:{contact_id}"
-        cached_contact = await cache_manager.get(cache_key)
-        
-        if cached_contact:
-            contact = cached_contact
-        else:
-            # Fetch from API
-            contact = await api_client.get_contact(contact_id)
-            
-            # Cache for 10 minutes
-            await cache_manager.set(cache_key, contact, ttl=600)
-        
-        # Apply field selection if specified
-        if include:
-            contact = _select_contact_fields([contact], include)[0]
-        
-        return contact
-        
-    except Exception as e:
-        logger.error(f"Error getting contact {contact_id}: {e}")
-        raise
-
-
 async def search_contacts_by_email(
-    context: Context,
+    context,
     email: str,
     include: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
-    """
-    Search contacts by email address.
-    
-    Args:
-        context: MCP context
-        email: Email address to search for
-        include: Fields to include in response
-        
-    Returns:
-        List of matching contacts
-    """
+    """Search contacts by email address."""
     try:
-        # Create email filter
-        filters = [{
-            "field": "email",
-            "operator": "EQUALS",
-            "value": email
-        }]
+        api_client: KeapApiService = context.api_client
+        cache_manager: CacheManager = context.cache_manager
         
-        return await list_contacts(
-            context=context,
-            filters=filters,
-            include=include
-        )
+        cache_key = f"search_email:{email}:{hash(str(include))}"
+        
+        # Check cache
+        cached_result = await cache_manager.get(cache_key)
+        if cached_result:
+            return cached_result
+        
+        # Search by email
+        params = {'email': email}
+        response = await api_client.get_contacts(**params)
+        contacts = response.get('contacts', [])
+        
+        # Process include fields
+        if include:
+            contacts = [process_contact_include_fields(contact, include) for contact in contacts]
+        
+        # Format contacts
+        formatted_contacts = [format_contact_data(contact) for contact in contacts]
+        
+        # Cache result
+        await cache_manager.set(cache_key, formatted_contacts, ttl=1800)
+        
+        logger.info(f"Found {len(formatted_contacts)} contacts for email: {email}")
+        return formatted_contacts
         
     except Exception as e:
-        logger.error(f"Error searching contacts by email {email}: {e}")
+        logger.error(f"Error searching contacts by email: {e}")
         raise
 
 
 async def search_contacts_by_name(
-    context: Context,
+    context,
     name: str,
     include: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
-    """
-    Search contacts by name (first or last).
-    
-    Args:
-        context: MCP context
-        name: Name to search for
-        include: Fields to include in response
-        
-    Returns:
-        List of matching contacts
-    """
+    """Search contacts by name (first or last)."""
     try:
-        # Create name filters (OR condition)
-        filters = [{
-            "operator": "OR",
-            "conditions": [
-                {
-                    "field": "given_name",
-                    "operator": "CONTAINS",
-                    "value": name
-                },
-                {
-                    "field": "family_name", 
-                    "operator": "CONTAINS",
-                    "value": name
-                }
-            ]
-        }]
+        api_client: KeapApiService = context.api_client
+        cache_manager: CacheManager = context.cache_manager
         
-        return await list_contacts(
-            context=context,
-            filters=filters,
-            include=include
-        )
+        cache_key = f"search_name:{name}:{hash(str(include))}"
+        
+        # Check cache
+        cached_result = await cache_manager.get(cache_key)
+        if cached_result:
+            return cached_result
+        
+        # Search by name - try both first and last name
+        all_contacts = []
+        
+        # Search by first name
+        response = await api_client.get_contacts(given_name=name)
+        contacts = response.get('contacts', [])
+        all_contacts.extend(contacts)
+        
+        # Search by last name
+        response = await api_client.get_contacts(family_name=name)
+        contacts = response.get('contacts', [])
+        all_contacts.extend(contacts)
+        
+        # Remove duplicates based on ID
+        unique_contacts = []
+        seen_ids = set()
+        for contact in all_contacts:
+            contact_id = contact.get('id')
+            if contact_id and contact_id not in seen_ids:
+                seen_ids.add(contact_id)
+                unique_contacts.append(contact)
+        
+        # Process include fields
+        if include:
+            unique_contacts = [process_contact_include_fields(contact, include) for contact in unique_contacts]
+        
+        # Format contacts
+        formatted_contacts = [format_contact_data(contact) for contact in unique_contacts]
+        
+        # Cache result
+        await cache_manager.set(cache_key, formatted_contacts, ttl=1800)
+        
+        logger.info(f"Found {len(formatted_contacts)} contacts for name: {name}")
+        return formatted_contacts
         
     except Exception as e:
-        logger.error(f"Error searching contacts by name {name}: {e}")
+        logger.error(f"Error searching contacts by name: {e}")
         raise
 
 
-def _select_contact_fields(contacts: List[Dict[str, Any]], 
-                          include: List[str]) -> List[Dict[str, Any]]:
-    """Select specific fields from contact records."""
-    if not include:
-        return contacts
-    
-    filtered_contacts = []
-    for contact in contacts:
-        filtered_contact = {}
-        for field in include:
-            if field in contact:
-                filtered_contact[field] = contact[field]
-        filtered_contacts.append(filtered_contact)
-    
-    return filtered_contacts
-
-
-def _sort_contacts(contacts: List[Dict[str, Any]], 
-                  order_by: str, 
-                  order_direction: str) -> List[Dict[str, Any]]:
-    """Sort contacts by specified field and direction."""
-    reverse = order_direction.upper() == "DESC"
-    
+async def get_contact_details(
+    context,
+    contact_id: str,
+    include: Optional[List[str]] = None
+) -> Dict[str, Any]:
+    """Get detailed information about a specific contact."""
     try:
-        return sorted(
-            contacts,
-            key=lambda x: x.get(order_by, ""),
-            reverse=reverse
-        )
-    except (TypeError, KeyError):
-        logger.warning(f"Could not sort by field: {order_by}")
-        return contacts
-
-
-# MCP tool definitions for contact operations
-CONTACT_TOOLS = [
-    {
-        "name": "list_contacts",
-        "description": "List contacts from Keap CRM with optional filtering",
-        "function": list_contacts
-    },
-    {
-        "name": "get_contact_by_id", 
-        "description": "Get a specific contact by ID",
-        "function": get_contact_by_id
-    },
-    {
-        "name": "search_contacts_by_email",
-        "description": "Search contacts by email address",
-        "function": search_contacts_by_email
-    },
-    {
-        "name": "search_contacts_by_name",
-        "description": "Search contacts by name",
-        "function": search_contacts_by_name
-    }
-]
+        api_client: KeapApiService = context.api_client
+        cache_manager: CacheManager = context.cache_manager
+        
+        cache_key = f"contact_details:{contact_id}:{hash(str(include))}"
+        
+        # Check cache
+        cached_result = await cache_manager.get(cache_key)
+        if cached_result:
+            return cached_result
+        
+        # Get contact details
+        contact = await api_client.get_contact(contact_id)
+        
+        # Process include fields
+        if include:
+            contact = process_contact_include_fields(contact, include)
+        
+        # Format contact
+        formatted_contact = format_contact_data(contact)
+        
+        # Cache result
+        await cache_manager.set(cache_key, formatted_contact, ttl=3600)  # 1 hour
+        
+        logger.info(f"Retrieved details for contact: {contact_id}")
+        return formatted_contact
+        
+    except Exception as e:
+        logger.error(f"Error getting contact details: {e}")
+        raise

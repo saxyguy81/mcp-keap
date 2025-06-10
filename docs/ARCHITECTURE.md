@@ -1,297 +1,224 @@
-# Keap MCP Service-Oriented Architecture
+# Keap MCP Simplified Architecture
 
 ## Overview
 
-The Keap MCP (Model Context Protocol) service represents a sophisticated, production-ready service-oriented architecture designed for optimal performance, scalability, and maintainability when interacting with the Keap CRM API.
+The Keap MCP (Model Context Protocol) service provides a streamlined, production-ready interface for interacting with the Keap CRM API. The architecture emphasizes simplicity, reliability, and maintainability.
 
 ## Architecture Principles
 
-### 1. Service-Oriented Design
-- **Separation of Concerns**: Each service has a single, well-defined responsibility
-- **Dependency Injection**: Services are loosely coupled through interfaces
-- **Async-First**: All operations are designed for asynchronous execution
-- **Performance-Optimized**: Multi-phase optimization strategy with intelligent query planning
+### 1. Simplicity-First Design
+- **Direct Implementation**: Minimal abstraction layers for better maintainability
+- **Clear Responsibilities**: Each module has a well-defined, focused purpose
+- **Async Operations**: All API interactions use async/await patterns
+- **Pragmatic Caching**: Simple SQLite-based persistent caching
 
-### 2. Layered Architecture
+### 2. Simplified Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    MCP Server Layer                        │
-│                 (tools.py interface)                       │
+│              (server.py + tools.py)                        │
 └─────────────────────────────────────────────────────────────┘
                                 │
 ┌─────────────────────────────────────────────────────────────┐
-│                 Query Services Layer                       │
-│        ContactQueryService │ TagQueryService               │
-└─────────────────────────────────────────────────────────────┘
-                                │
-┌─────────────────────────────────────────────────────────────┐
-│              Strategy & Optimization Layer                 │
-│   FilterStrategyService │ ApiParameterOptimizer            │
-│   ParallelTagOptimizer │ FilterSelectivityOptimizer       │
-│   AdaptiveBatchOptimizer │ ConnectionPoolManager           │
+│                  MCP Tools Layer                          │
+│         contact_tools.py │ tag_tools.py                   │
 └─────────────────────────────────────────────────────────────┘
                                 │
 ┌─────────────────────────────────────────────────────────────┐
 │                Infrastructure Layer                        │
-│    API Services │ Cache │ Transformation │ Monitoring      │
+│    API Client │ Cache Manager │ Schemas │ Utils            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ## Core Components
 
-### Query Services (`src/services/query.py`)
-**Primary Interface Layer**
+### MCP Server (`src/mcp/server.py`)
+**Main Application Entry Point**
 
-- `ContactQueryService`: Optimized contact data retrieval with intelligent strategy selection
-- `TagQueryService`: Tag management with performance monitoring and caching
+- FastMCP-based server implementation
+- Tool registration and management
+- Request routing and response handling
+- Error handling and logging
 
-**Key Features:**
-- Automatic performance monitoring integration
-- Strategy-based query execution (cached, tag-optimized, simple filter, bulk retrieve)
-- Intelligent client-side filtering with optimized execution order
-- Comprehensive error handling and recovery
+### MCP Tools (`src/mcp/tools.py`)
+**Tool Interface Layer**
 
-### Strategy & Optimization Layer
+- Unified interface for all 5 MCP tools
+- Context management for shared components
+- Tool parameter validation and processing
+- Integration with contact and tag tools
 
-#### FilterStrategyService (`src/services/strategy.py`)
-**Query Planning and Optimization**
+**Available Tools:**
+1. `list_contacts` - Contact listing with filtering and pagination
+2. `get_tags` - Tag retrieval with optional filtering
+3. `search_contacts_by_email` - Email-based contact search
+4. `search_contacts_by_name` - Name-based contact search  
+5. `get_contacts_with_tag` - Tag-based contact filtering
 
-- Analyzes query complexity and selects optimal execution strategy
-- Integrates with all optimization components
-- Provides query cost estimation and cache analysis
-- Supports weighted strategy scoring for intelligent selection
+### Contact Tools (`src/mcp/contact_tools.py`)
+**Contact-Specific Operations**
 
-**Optimization Strategies:**
-1. **CACHED_RESULT**: Use pre-cached query results
-2. **TAG_OPTIMIZED**: Parallel tag queries with result merging
-3. **SIMPLE_FILTER**: Server-side filtering with API optimization
-4. **BULK_RETRIEVE**: Client-side filtering for complex scenarios
+- Contact listing with filter support
+- Email and name-based search functionality
+- Field selection and data formatting
+- API client integration with error handling
 
-#### API Parameter Optimization (`src/services/api_optimization.py`)
-**Phase 2: Server-Side Filtering Intelligence**
+### Tag Tools (`src/mcp/tag_tools.py`)
+**Tag Management Operations**
 
-- Analyzes filter conditions for optimal server vs client-side processing
-- Maps filter fields to API parameters with operator support detection
-- Provides estimated data reduction ratios
-- Strategy classification: highly_optimized → minimal_optimization
+- Tag listing and filtering
+- Contact-tag relationship queries
+- Tag metadata retrieval
+- Category-aware operations
 
-**Supported Optimizations:**
-- Contact queries: 12 fields, 8 operators with intelligent parameter mapping
-- Tag queries: 4 fields, 3 operators with category-aware filtering
-- Automatic filter distribution based on API capabilities
+### API Client (`src/api/client.py`)
+**Keap API Communication**
 
-#### Performance Optimizers (`src/services/optimization.py`)
-**Phase 1: Execution Optimization**
+- Direct HTTP communication with Keap API
+- Authentication and request headers
+- Error handling and retry logic
+- Rate limiting compliance
 
-1. **ParallelTagQueryOptimizer**
-   - Concurrent tag queries with semaphore-based throttling
-   - Configurable concurrency limits and error handling
-   - Performance metrics collection for optimization learning
+### Cache Manager (`src/cache/`)
+**Persistent Caching System**
 
-2. **FilterSelectivityOptimizer**
-   - Execution order optimization based on filter selectivity
-   - Learning-based selectivity estimation with historical data
-   - Performance tracking for continuous improvement
-
-3. **AdaptiveBatchOptimizer**
-   - Dynamic batch size optimization based on performance history
-   - Trend analysis for intelligent batch size adjustments
-   - Operation-specific optimization with endpoint awareness
-
-### Connection Management (`src/services/connection_pool.py`)
-**Advanced HTTP Connection Optimization**
-
-- **HTTP/2 Support**: Automatic protocol negotiation with multiplexing
-- **Connection Pooling**: Intelligent reuse with configurable limits
-- **Health Monitoring**: Automatic connection cleanup and error tracking
-- **Performance Metrics**: Comprehensive connection and request statistics
-
-**Features:**
-- Per-host connection limits with global maximum
-- Idle connection timeout and cleanup
-- Connection health monitoring with automatic recovery
-- Request multiplexing over HTTP/2 connections
-
-### Performance Monitoring (`src/services/performance_monitor.py`)
-**Real-Time System Health and Optimization Insights**
-
-- **Query Performance Tracking**: Automatic timing and metrics collection
-- **System Health Monitoring**: Error rates, response times, cache efficiency
-- **Optimization Analytics**: Strategy effectiveness and performance insights
-- **Alert Generation**: Configurable thresholds with background monitoring
-
-**Capabilities:**
-- Context manager-based query tracking
-- Historical data retention with configurable windows
-- Performance summary generation with statistical analysis
-- Metrics export for external monitoring systems
-- Real-time alerts for performance degradation
-
-### Infrastructure Layer
-
-#### API Services
-- `KeapApiService`: Standard API service with retry logic and error handling
-- `EnhancedKeapApiService`: Next-generation service with connection pooling and HTTP/2
-- Support for both Keap API v1 and v2 with intelligent fallback
-
-#### Cache Management (`src/cache/manager.py`)
-- SQLite-based persistent caching with error handling
-- Configurable TTL and memory limits
+- **PersistentCacheManager**: SQLite-based storage with TTL support
+- **CacheManager**: In-memory caching with cleanup operations
+- Configurable cache limits and expiration
 - Performance metrics and hit ratio tracking
-- Intelligent cache key generation for query result caching
 
-#### Data Transformation (`src/services/transformation.py`)
-- Pydantic-based model transformation with type safety
-- Support for Contact and Tag model hierarchies
-- Flexible include specifications for data minimization
-- Error handling with graceful degradation
+### Schemas (`src/schemas/definitions.py`)
+**Data Models and Validation**
 
-## Optimization Strategy
+- Pydantic models for type safety
+- Request/response validation
+- Contact and Tag data structures
+- Filter condition definitions
 
-### Multi-Phase Approach
+### Utilities (`src/utils/`)
+**Shared Infrastructure**
 
-#### Phase 1: Execution Optimization
-- **Parallel Processing**: Concurrent tag queries and batch operations
-- **Filter Optimization**: Selectivity-based execution order
-- **Adaptive Batching**: Dynamic batch size optimization
+- **Configuration**: Environment-based settings management
+- **Contact Utils**: Contact data processing and formatting
+- **Filter Utils**: Filter validation and processing
+- **Logging**: Structured logging configuration
 
-#### Phase 2: API Intelligence
-- **Server-Side Filtering**: Intelligent parameter optimization
-- **Connection Optimization**: HTTP/2 and connection pooling
-- **Strategy Enhancement**: API optimization insights integration
+## Data Flow
 
-#### Phase 3: Advanced Caching (Future)
-- **Hierarchical Keys**: Smart cache invalidation strategies
-- **Cache Warming**: Predictive data loading
-- **Distributed Caching**: Multi-instance coordination
+### Typical Request Flow
 
-### Performance Characteristics
+1. **MCP Request** → MCP Server receives tool request
+2. **Tool Dispatch** → Server routes to appropriate tool function
+3. **Context Setup** → Tool initializes API client and cache manager
+4. **Cache Check** → Check for cached results
+5. **API Request** → Query Keap API if cache miss
+6. **Data Processing** → Format and validate response data
+7. **Cache Store** → Store results for future requests
+8. **Response** → Return formatted data to MCP client
 
-**Typical Performance Metrics:**
-- Simple queries: 50-200ms response time
-- Complex queries: 200-800ms with optimization
-- Cache hits: <50ms response time
-- Concurrent queries: Linear scalability up to connection limits
+### Error Handling Strategy
 
-**Optimization Effectiveness:**
-- Server-side filtering: 60-95% data reduction
-- Connection pooling: 40-70% connection overhead reduction
-- Parallel tag queries: 2-5x performance improvement
-- Filter optimization: 20-40% execution time reduction
+- **API Errors**: Retry logic with exponential backoff
+- **Network Issues**: Connection timeout and recovery
+- **Data Validation**: Graceful handling of malformed data
+- **Cache Failures**: Fallback to direct API calls
 
-## Error Handling and Resilience
+## Configuration
 
-### Multi-Layer Error Handling
-1. **API Layer**: Retry logic with exponential backoff
-2. **Service Layer**: Graceful degradation and fallback strategies
-3. **Connection Layer**: Health monitoring and automatic recovery
-4. **Monitoring Layer**: Alert generation and performance tracking
+### Environment Variables
 
-### Recovery Strategies
-- **Rate Limiting**: Automatic detection and retry-after handling
-- **Connection Failures**: Pool cleanup and reconnection
-- **Query Failures**: Strategy fallback and partial result handling
-- **Performance Degradation**: Strategy adjustment and optimization
-
-## Configuration and Deployment
-
-### Environment Configuration
-```python
+```bash
 # Core Configuration
 KEAP_API_KEY=your_api_key_here
 KEAP_API_BASE_URL=https://api.infusionsoft.com/crm/rest/v1
 
-# Optimization Settings
-ENABLE_OPTIMIZATIONS=true
-MAX_CONCURRENT_TAG_QUERIES=3
-FILTER_SELECTIVITY_LEARNING=true
-ADAPTIVE_BATCH_SIZING=true
-
-# Connection Pool Settings
-MAX_CONNECTIONS=20
-MAX_CONNECTIONS_PER_HOST=5
-ENABLE_HTTP2=true
-CONNECTION_TIMEOUT=10.0
-KEEP_ALIVE_TIMEOUT=30.0
-
-# Performance Monitoring
-ENABLE_PERFORMANCE_MONITORING=true
-METRIC_COLLECTION_INTERVAL=5.0
-PERFORMANCE_HISTORY_HOURS=24
+# Server Configuration  
+KEAP_MCP_HOST=127.0.0.1
+KEAP_MCP_PORT=5000
+KEAP_MCP_LOG_LEVEL=INFO
 
 # Cache Configuration
+KEAP_MCP_CACHE_ENABLED=true
+KEAP_MCP_CACHE_TTL=3600
 CACHE_DB_PATH=keap_cache.db
-CACHE_MAX_ENTRIES=10000
-CACHE_MAX_MEMORY_MB=100
 ```
 
-### Service Container
-The architecture uses dependency injection through `ServiceContainer` for:
-- Lifecycle management of all services
-- Configuration injection and environment handling
-- Graceful shutdown and resource cleanup
-- Service health monitoring and status reporting
+### Key Configuration Options
+
+- **Host/Port**: Server binding configuration
+- **Cache TTL**: Default cache expiration (1 hour)
+- **Log Level**: Logging verbosity control
+- **Database Path**: SQLite cache file location
+
+## Performance Characteristics
+
+### Response Times
+- **Cache Hits**: <50ms typical response
+- **Simple API Calls**: 200-500ms depending on data size
+- **Complex Filters**: 500-1000ms with client-side processing
+
+### Caching Strategy
+- **Contact Data**: 1-hour TTL for contact information
+- **Tag Data**: 1-hour TTL for tag metadata
+- **Search Results**: 30-minute TTL for search queries
+
+### Resource Usage
+- **Memory**: Minimal footprint with SQLite persistence
+- **Disk**: Configurable cache size limits
+- **Network**: Single connection per request with keep-alive
 
 ## Security Considerations
 
 ### API Security
-- Secure API token management through environment variables
-- Request signing and authentication header management
-- Rate limiting compliance and respectful API usage
+- API key management through environment variables
+- HTTPS-only communication with certificate validation
+- Request signing and proper authentication headers
 
 ### Data Protection
-- No sensitive data logging or caching
-- Secure cache storage with appropriate file permissions
+- No sensitive data in logs
+- Secure cache file permissions
 - Memory-safe operations with automatic cleanup
 
-### Network Security
-- HTTPS-only communication with certificate validation
-- Connection pooling with secure connection reuse
-- Timeout management to prevent resource exhaustion
-
-## Monitoring and Observability
-
-### Built-in Metrics
-- Query performance: execution time, API calls, cache efficiency
-- System health: error rates, response times, resource usage
-- Optimization effectiveness: strategy performance, cache hit ratios
-- Connection pool: active connections, reuse rates, health status
-
-### External Integration
-- JSON metrics export for external monitoring systems
-- Structured logging for centralized log management
-- Alert generation for performance threshold violations
-- Performance insights and optimization recommendations
-
-## Development and Testing
+## Testing Strategy
 
 ### Test Coverage
-- **Unit Tests**: Individual service components and optimization algorithms
-- **Integration Tests**: Service interaction and optimization effectiveness
-- **Performance Tests**: Load testing and optimization validation
-- **End-to-End Tests**: Complete workflow validation with real API interaction
+- **Unit Tests**: Individual component testing (100% coverage)
+- **Integration Tests**: End-to-end workflow validation
+- **API Validation**: Real Keap API interaction testing
+
+### Test Categories
+- `tests/unit/` - Component-level testing
+- `tests/integration/` - Full system testing
+- `conftest.py` - Shared test fixtures and configuration
+
+## Development Workflow
+
+### Code Quality
+- **Type Safety**: Full type hints with Pydantic models
+- **Async Patterns**: Consistent async/await usage
+- **Error Handling**: Comprehensive exception management
+- **Logging**: Structured logging throughout
 
 ### Development Tools
-- Comprehensive type hints with Pydantic models
-- Async/await patterns throughout the codebase
-- Configurable logging with structured output
-- Development server with hot reloading
+- **pytest**: Testing framework with coverage reporting
+- **ruff**: Code formatting and linting
+- **mypy**: Static type checking (when enabled)
 
-## Future Enhancements
+## Deployment
 
-### Planned Features
-1. **GraphQL-Style Query Language**: Advanced filtering with dynamic field selection
-2. **Real-Time Capabilities**: WebSocket support and live data streaming
-3. **Multi-Tenant Architecture**: Tenant isolation and resource quotas
-4. **Advanced Security**: Role-based access control and audit logging
+### Production Considerations
+- Environment variable configuration
+- Log file rotation and management
+- Cache database backup and cleanup
+- Health check endpoint availability
 
-### Scalability Roadmap
-- Horizontal scaling with load balancing
-- Distributed caching with Redis/Memcached
-- Microservices decomposition for independent scaling
-- Event-driven architecture with message queues
+### Monitoring
+- Request/response logging
+- Cache hit ratio tracking
+- Error rate monitoring
+- Performance metrics collection
 
 ---
 
-This architecture represents a production-ready, enterprise-grade solution for Keap CRM integration with sophisticated optimization, monitoring, and scalability features.
+This simplified architecture prioritizes maintainability and reliability over complex optimization, providing a solid foundation for Keap CRM integration through the MCP protocol.

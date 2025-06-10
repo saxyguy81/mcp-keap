@@ -41,3 +41,4 @@ htmlcov/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+keap_cache.db*
