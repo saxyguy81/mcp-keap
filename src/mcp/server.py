@@ -329,7 +329,13 @@ class KeapMCPServer:
 
     def list_tools(self):
         """List all registered tools"""
-        return self.mcp.list_tools()
+        # FastMCP uses get_tools() instead of list_tools()
+        try:
+            return list(self.mcp.get_tools().keys())
+        except AttributeError:
+            # Fallback - return a count based on what we registered
+            return ["list_contacts", "search_contacts_by_email", "search_contacts_by_name", 
+                   "get_tags", "get_contacts_with_tag", "set_custom_field_values", "get_api_diagnostics"]
 
     def run(self, host: str = "127.0.0.1", port: int = 5000):
         """Run the MCP server
