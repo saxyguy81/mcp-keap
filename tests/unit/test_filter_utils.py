@@ -5,7 +5,6 @@ Tests utility functions for filtering data with pattern matching
 including wildcard support and edge cases.
 """
 
-import pytest
 from src.utils.filter_utils import filter_by_name_pattern
 
 

@@ -11,20 +11,16 @@ import asyncio
 import tempfile
 import json
 import time
-import sqlite3
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch, mock_open
-from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.api.client import KeapApiService
-from src.cache.manager import CacheManager
 from src.cache.persistent_manager import PersistentCacheManager
 from src.mcp.optimization.optimization import QueryExecutor, QueryOptimizer, QueryMetrics
 from src.mcp.optimization.api_optimization import ApiParameterOptimizer, OptimizationResult
 from src.mcp.tools import (
     list_contacts, get_tags, search_contacts_by_email, search_contacts_by_name,
-    get_contact_details, apply_tags_to_contacts, remove_tags_from_contacts,
-    create_tag, get_tag_details, modify_tags, set_custom_field_values,
+    get_contact_details, apply_tags_to_contacts, create_tag, set_custom_field_values,
     query_contacts_optimized, analyze_query_performance, get_api_diagnostics
 )
 from src.utils.contact_utils import (
@@ -596,17 +592,17 @@ class TestAdvancedCoverageIntegration:
             assert len(all_contacts) == 3
             
             # 2. Search and filter workflow
-            email_search = await search_contacts_by_email(mock_context, "@example.com")
-            name_search = await search_contacts_by_name(mock_context, "John")
+            await search_contacts_by_email(mock_context, "@example.com")
+            await search_contacts_by_name(mock_context, "John")
             
             # 3. Detailed contact analysis
             for contact in all_contacts[:2]:  # Analyze first 2 contacts
                 details = await get_contact_details(mock_context, str(contact["id"]))
                 
                 # Process contact data
-                formatted = format_contact_data(details)
-                primary_email = get_primary_email(details)
-                full_name = get_full_name(details)
+                format_contact_data(details)
+                get_primary_email(details)
+                get_full_name(details)
                 tag_ids = get_tag_ids(details)
                 
                 # Extract custom field values
@@ -622,10 +618,10 @@ class TestAdvancedCoverageIntegration:
                         )
             
             # 4. Tag management workflow
-            all_tags = await get_tags(mock_context, include_categories=True)
+            await get_tags(mock_context, include_categories=True)
             
             # Create new tag
-            new_tag = await create_tag(
+            await create_tag(
                 mock_context,
                 name="Workflow Test",
                 description="Created during workflow test",
@@ -646,7 +642,7 @@ class TestAdvancedCoverageIntegration:
             ]
             
             # Query with optimization
-            optimized_result = await query_contacts_optimized(
+            await query_contacts_optimized(
                 mock_context,
                 filters=filters,
                 enable_optimization=False,  # Use basic path for testing
@@ -654,12 +650,12 @@ class TestAdvancedCoverageIntegration:
             )
             
             # Analyze query performance
-            performance_analysis = await analyze_query_performance(
+            await analyze_query_performance(
                 mock_context, filters, query_type="contact"
             )
             
             # 6. System diagnostics and monitoring
-            diagnostics = await get_api_diagnostics(mock_context)
+            await get_api_diagnostics(mock_context)
             
             # Verify comprehensive workflow completion
             assert mock_api_client.get_contacts.call_count >= 2

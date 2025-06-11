@@ -3,7 +3,6 @@ Advanced unit tests for MCP Tools - focusing on uncovered functionality
 """
 
 import pytest
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from mcp.server.fastmcp import Context
 
@@ -114,8 +113,8 @@ class TestAdvancedMCPTools:
         """Test optimized contact query"""
         mock_contacts = [{"id": 1, "name": "John Doe"}]
         
-        with patch('src.mcp.tools.get_api_client') as mock_get_api, \
-             patch('src.mcp.tools.get_cache_manager') as mock_get_cache, \
+        with patch('src.mcp.tools.get_api_client'), \
+             patch('src.mcp.tools.get_cache_manager'), \
              patch('src.mcp.contact_tools.list_contacts', return_value=mock_contacts) as mock_list:
             
             result = await query_contacts_optimized(
@@ -268,7 +267,7 @@ class TestAdvancedMCPTools:
         tag_ids = ["10", "20"]
         
         with patch('src.mcp.tools.get_api_client') as mock_get_api, \
-             patch('src.mcp.tools.get_cache_manager') as mock_get_cache:
+             patch('src.mcp.tools.get_cache_manager'):
             
             mock_api_client = AsyncMock()
             mock_api_client.apply_tag_to_contacts.return_value = {"success": True}
@@ -292,7 +291,7 @@ class TestAdvancedMCPTools:
         tag_ids = ["10"]
         
         with patch('src.mcp.tools.get_api_client') as mock_get_api, \
-             patch('src.mcp.tools.get_cache_manager') as mock_get_cache:
+             patch('src.mcp.tools.get_cache_manager'):
             
             mock_api_client = AsyncMock()
             mock_api_client.remove_tag_from_contacts.return_value = {"success": True}

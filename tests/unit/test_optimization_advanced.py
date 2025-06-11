@@ -3,8 +3,7 @@ Advanced unit tests for optimization modules - covering missing functionality
 """
 
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-from datetime import datetime
+from unittest.mock import MagicMock, AsyncMock
 
 from src.mcp.optimization.optimization import QueryExecutor, QueryOptimizer, QueryMetrics
 from src.mcp.optimization.api_optimization import (

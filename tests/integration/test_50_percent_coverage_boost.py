@@ -9,7 +9,6 @@ import pytest
 import asyncio
 import tempfile
 import json
-import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
@@ -372,7 +371,7 @@ class Test50PercentCoverageBoost:
                     f"contact:{i}:details",
                     f"contact:{i}:tags", 
                     f"contact:{i}:history",
-                    f"contacts:list",
+                    "contacts:list",
                     f"contacts:search:{i}"
                 ]
                 

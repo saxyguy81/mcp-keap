@@ -8,7 +8,6 @@ execution, error handling, and integration with all underlying components.
 import pytest
 import asyncio
 import tempfile
-import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 

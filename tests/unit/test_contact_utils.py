@@ -5,7 +5,6 @@ Tests all utility functions for working with Keap contact data
 including email extraction, name formatting, tag handling, and more.
 """
 
-import pytest
 from src.utils.contact_utils import (
     get_primary_email,
     get_full_name,

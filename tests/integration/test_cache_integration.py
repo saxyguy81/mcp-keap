@@ -8,10 +8,9 @@ including real API calls, cache effectiveness, and data consistency.
 import pytest
 import asyncio
 import time
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 
 from src.cache.manager import CacheManager
-from src.api.client import KeapApiService
 
 
 @pytest.mark.integration
@@ -81,7 +80,7 @@ class TestCacheAPIIntegration:
                 initial_stats = test_cache.get_stats()
                 
                 # Test cache invalidation functionality
-                tag_ids = [tag["id"] for tag in tags[:3]]
+                [tag["id"] for tag in tags[:3]]
                 
                 # Simulate cache invalidation (using cleanup instead)
                 test_cache.cleanup_expired()
@@ -103,7 +102,7 @@ class TestCacheAPIIntegration:
             # First call
             start_time = time.time()
             response1 = await integration_client.get_contacts(limit=10)
-            first_call_time = time.time() - start_time
+            time.time() - start_time
             
             # Extract contacts from response
             contacts1 = response1.get('contacts', []) if isinstance(response1, dict) else response1
@@ -111,7 +110,7 @@ class TestCacheAPIIntegration:
             # Second call with same parameters
             start_time = time.time()
             response2 = await integration_client.get_contacts(limit=10)
-            second_call_time = time.time() - start_time
+            time.time() - start_time
             
             contacts2 = response2.get('contacts', []) if isinstance(response2, dict) else response2
             
@@ -145,7 +144,7 @@ class TestCachePerformanceImpact:
             # Make same call multiple times
             for i in range(5):
                 start_time = time.time()
-                response = await integration_client.get_tags(limit=100)
+                await integration_client.get_tags(limit=100)
                 call_time = time.time() - start_time
                 call_times.append(call_time)
                 
@@ -246,11 +245,11 @@ class TestCacheDataConsistency:
         with patch('src.mcp.tools.get_cache_manager', return_value=test_cache):
             # Cache multiple different types of data
             tag_response = await integration_client.get_tags(limit=10)
-            tags = tag_response.get('tags', []) if isinstance(tag_response, dict) else tag_response
+            tag_response.get('tags', []) if isinstance(tag_response, dict) else tag_response
             
             # Query contacts (different cache entries)
             contact_response = await integration_client.get_contacts(limit=5)
-            contacts = contact_response.get('contacts', []) if isinstance(contact_response, dict) else contact_response
+            contact_response.get('contacts', []) if isinstance(contact_response, dict) else contact_response
             
             # Manually add some cache entries for testing
             for i in range(5):
@@ -284,7 +283,7 @@ class TestCacheWithMCPTools:
             # First call (using valid API parameters)
             start_time = time.time()
             response1 = await integration_client.get_contacts(limit=10)
-            first_call_time = time.time() - start_time
+            time.time() - start_time
             
             contacts1 = response1.get('contacts', []) if isinstance(response1, dict) else response1
             
@@ -319,7 +318,7 @@ class TestCacheWithMCPTools:
             test_cache.set("cached_contacts", contacts, ttl=3600)
             test_cache.set("cached_tags", tags, ttl=3600)
             
-            initial_stats = test_cache.get_stats()
+            test_cache.get_stats()
             
             # Simulate tag modification by clearing cache
             test_cache.cleanup_expired()  # Simulate invalidation

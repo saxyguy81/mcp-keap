@@ -405,7 +405,7 @@ class TestAdditionalCoverageBoost:
     
     def test_optimization_additional_coverage(self):
         """Additional optimization coverage to improve existing coverage."""
-        from src.mcp.optimization.optimization import QueryOptimizer, QueryMetrics, QueryExecutor
+        from src.mcp.optimization.optimization import QueryOptimizer, QueryMetrics
         from src.mcp.optimization.api_optimization import ApiParameterOptimizer, OptimizationResult
         
         # Test QueryOptimizer with edge cases

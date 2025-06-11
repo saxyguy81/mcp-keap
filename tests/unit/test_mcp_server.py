@@ -39,7 +39,7 @@ class TestKeapMCPServerInit:
         with patch('src.mcp.server.FastMCP'):
             with patch.object(KeapMCPServer, '_register_tools') as mock_register_tools:
                 with patch.object(KeapMCPServer, '_register_resources') as mock_register_resources:
-                    server = KeapMCPServer()
+                    KeapMCPServer()
                     
                     mock_register_tools.assert_called_once()
                     mock_register_resources.assert_called_once()
@@ -54,7 +54,7 @@ class TestRegisterTools:
             mock_mcp_instance = MagicMock()
             mock_fastmcp.return_value = mock_mcp_instance
             
-            server = KeapMCPServer()
+            KeapMCPServer()
             
             # Check that add_tool was called for each tool
             expected_calls = [
@@ -85,7 +85,7 @@ class TestRegisterResources:
             mock_mcp_instance = MagicMock()
             mock_fastmcp.return_value = mock_mcp_instance
             
-            server = KeapMCPServer()
+            KeapMCPServer()
             
             # Verify resource decorator was called
             mock_mcp_instance.resource.assert_any_call("keap://schema")
@@ -107,7 +107,6 @@ class TestRegisterResources:
             
             # The resource function is decorated, so we can't easily test it directly
             # Instead, we test the expected schema structure
-            expected_fields = ["contacts", "tags", "filter_examples"]
             
             # This is a basic test - in a real scenario, you'd test the actual decorated function
             assert hasattr(server, 'mcp')
@@ -118,14 +117,6 @@ class TestRegisterResources:
             server = KeapMCPServer()
             
             # Similar to schema test - testing basic structure
-            expected_capabilities = [
-                "query_contacts",
-                "get_contact_details", 
-                "query_tags",
-                "get_tag_details",
-                "modify_tags",
-                "intersect_id_lists"
-            ]
             
             # Basic test for server initialization
             assert hasattr(server, 'mcp')
@@ -200,7 +191,7 @@ class TestSchemaResourceContent:
             
             mock_mcp_instance.resource.side_effect = capture_schema_decorator
             
-            server = KeapMCPServer()
+            KeapMCPServer()
             
             # Call the captured schema function
             assert schema_function is not None
@@ -251,7 +242,7 @@ class TestSchemaResourceContent:
             
             mock_mcp_instance.resource.side_effect = capture_capabilities_decorator
             
-            server = KeapMCPServer()
+            KeapMCPServer()
             
             # Call the captured capabilities function
             assert capabilities_function is not None
@@ -366,22 +357,14 @@ class TestResourceFunctionContent:
     
     def test_schema_contains_filter_examples(self):
         """Test that schema contains comprehensive filter examples."""
-        with patch('src.mcp.server.FastMCP') as mock_fastmcp:
-            mock_mcp_instance = MagicMock()
+        with patch('src.mcp.server.FastMCP'):
+            MagicMock()
             
             # We'll manually test the schema content by calling the method
-            server = KeapMCPServer()
+            KeapMCPServer()
             
             # Since we can't easily extract the decorated function,
             # we'll test the expected content structure
-            expected_filter_examples = [
-                "first_name pattern matching",
-                "email pattern matching", 
-                "date range filtering",
-                "OR conditions",
-                "tag expressions",
-                "custom field filtering"
-            ]
             
             # This is a structural test - the actual schema should contain these concepts
             assert True  # Placeholder for actual schema content verification

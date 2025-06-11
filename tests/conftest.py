@@ -9,10 +9,9 @@ import os
 import pytest
 import asyncio
 import tempfile
-import sqlite3
 from pathlib import Path
-from typing import Dict, Any, List
-from unittest.mock import AsyncMock, Mock, patch
+from typing import Dict, Any
+from unittest.mock import AsyncMock
 
 from dotenv import load_dotenv
 from src.cache.manager import CacheManager

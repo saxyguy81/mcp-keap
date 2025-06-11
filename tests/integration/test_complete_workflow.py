@@ -304,7 +304,6 @@ class TestErrorRecoveryIntegration:
     @pytest.mark.asyncio
     async def test_api_failure_recovery(self, mock_environment):
         """Test system recovery from API failures."""
-        from src.api.client import KeapApiService
         
         with patch.dict(os.environ, {"KEAP_API_KEY": "test_key"}):
             # Test that API client can be created and handles errors
@@ -349,7 +348,6 @@ class TestCompleteSystemIntegration:
         # This test simulates a real-world usage scenario
         
         # 1. Initialize system components
-        from src.api.client import KeapApiService
         from src.cache.manager import CacheManager
         from src.mcp.optimization.api_optimization import ApiParameterOptimizer
         

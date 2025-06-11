@@ -4,7 +4,6 @@ Unit tests for advanced filter utilities functionality.
 
 import pytest
 from datetime import datetime, timezone
-from unittest.mock import patch
 
 from src.utils.filter_utils import (
     filter_by_name_pattern, validate_filter_conditions, evaluate_filter_condition,

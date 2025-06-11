@@ -1,5 +1,4 @@
 import requests
-import json
 
 # Base URL for our server
 BASE_URL = "http://localhost:5001/api"
@@ -11,7 +10,7 @@ def test_search_contacts():
         'first_name_match': 'exact'
     }
     
-    print(f"Searching for contacts with first name 'scott'...")
+    print("Searching for contacts with first name 'scott'...")
     response = requests.get(f"{BASE_URL}/contacts", params=params)
     
     if response.status_code == 200:

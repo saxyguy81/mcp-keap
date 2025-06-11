@@ -10,11 +10,8 @@ Tests the SQLite-based persistent cache implementation including:
 - Database persistence
 """
 
-import pytest
 import time
-import asyncio
 import threading
-from unittest.mock import patch
 from src.cache.persistent_manager import PersistentCacheManager
 
 
@@ -372,7 +369,7 @@ class TestCacheErrorHandling:
         cache_manager.set("lock_key", lock)
         
         # Should return None since it couldn't be stored
-        result = cache_manager.get("lock_key")
+        cache_manager.get("lock_key")
         # Note: This might succeed depending on pickle version
         # The important thing is that it doesn't crash
     

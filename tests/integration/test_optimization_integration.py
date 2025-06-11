@@ -10,7 +10,7 @@ import asyncio
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 from src.mcp.optimization.optimization import QueryExecutor, QueryOptimizer
 from src.mcp.optimization.api_optimization import ApiParameterOptimizer

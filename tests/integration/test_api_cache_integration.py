@@ -9,11 +9,10 @@ import asyncio
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 from src.api.client import KeapApiService
 from src.cache.manager import CacheManager
-from src.cache.persistent_manager import PersistentCacheManager
 
 
 class TestApiCacheIntegration:

@@ -11,7 +11,6 @@ import asyncio
 import tempfile
 import json
 import time
-import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 

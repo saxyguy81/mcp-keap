@@ -9,32 +9,27 @@ MCP server functionality, and complex error scenarios.
 import pytest
 import asyncio
 import tempfile
-import json
 import time
-import sqlite3
 import aiohttp
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch, mock_open, call
-from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime
 
 from src.api.client import KeapApiService
-from src.cache.manager import CacheManager
 from src.cache.persistent_manager import PersistentCacheManager
 from src.mcp.server import KeapMCPServer
 from src.mcp.tools import (
     list_contacts, get_tags, search_contacts_by_email, search_contacts_by_name,
-    get_contact_details, apply_tags_to_contacts, remove_tags_from_contacts,
-    create_tag, get_tag_details, modify_tags, set_custom_field_values,
-    query_contacts_optimized, analyze_query_performance, get_api_diagnostics,
-    get_available_tools, get_tool_by_name, get_api_client, get_cache_manager
+    apply_tags_to_contacts, create_tag, set_custom_field_values,
+    query_contacts_optimized, get_api_diagnostics,
+    get_available_tools, get_tool_by_name
 )
 from src.utils.contact_utils import (
     get_custom_field_value, format_contact_data, process_contact_include_fields,
     get_primary_email, get_full_name, get_tag_ids, format_contact_summary
 )
 from src.utils.filter_utils import (
-    apply_complex_filters, filter_by_name_pattern, evaluate_filter_condition,
-    get_nested_value, parse_date_value, validate_filter_conditions
+    apply_complex_filters, filter_by_name_pattern, get_nested_value, parse_date_value, validate_filter_conditions
 )
 
 
@@ -674,8 +669,8 @@ class TestMaximumCoverageIntegration:
                 assert field_value is not None
             
             # Workflow 2: Advanced filtering and search
-            email_search = await search_contacts_by_email(mock_context, "john@example.com")
-            name_search = await search_contacts_by_name(mock_context, "John")
+            await search_contacts_by_email(mock_context, "john@example.com")
+            await search_contacts_by_name(mock_context, "John")
             
             # Apply complex filters
             complex_filters = [
@@ -801,7 +796,7 @@ class TestMaximumCoverageIntegration:
         finally:
             try:
                 cache.close()
-            except:
+            except Exception:
                 pass
         
         # Test 3: Tool execution with cascading failures

@@ -8,7 +8,6 @@ import sqlite3
 import time
 import threading
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 from src.cache.persistent_manager import PersistentCacheManager
 
@@ -358,7 +357,7 @@ class TestPersistentCacheManagerAdvanced:
         finally:
             try:
                 cache_manager.close()
-            except:
+            except Exception:
                 pass  # May already be closed
     
     def test_close_cleanup(self, temp_db_path):

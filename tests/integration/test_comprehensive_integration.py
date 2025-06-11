@@ -14,21 +14,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.mcp.tools import (
     list_contacts, get_tags, search_contacts_by_email, search_contacts_by_name,
-    get_contact_details, apply_tags_to_contacts, remove_tags_from_contacts,
-    query_contacts_optimized, analyze_query_performance, get_api_diagnostics,
+    get_contact_details, analyze_query_performance, get_api_diagnostics,
     intersect_id_lists, query_contacts_by_custom_field, set_custom_field_values,
-    create_tag, get_tag_details, modify_tags, get_available_tools, get_tool_by_name
+    create_tag, get_tag_details, get_available_tools, get_tool_by_name
 )
 from src.utils.contact_utils import (
-    get_custom_field_value, format_contact_data, process_contact_include_fields,
-    get_primary_email, get_full_name, get_tag_ids, format_contact_summary
+    get_custom_field_value, format_contact_data, get_primary_email, get_full_name, get_tag_ids
 )
 from src.utils.filter_utils import (
     apply_complex_filters, filter_by_name_pattern, evaluate_filter_condition,
     get_nested_value, parse_date_value
 )
 from src.api.client import KeapApiService
-from src.cache.manager import CacheManager
 
 
 class TestComprehensiveIntegration:

@@ -3,7 +3,7 @@ Tests for tag-specific MCP tools.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from src.mcp.tag_tools import (
     get_tags,
     get_contacts_with_tag,

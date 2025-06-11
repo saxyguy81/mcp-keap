@@ -13,7 +13,6 @@ import asyncio
 import logging
 from datetime import datetime
 from dotenv import load_dotenv
-import httpx
 
 # Add parent directory to path to import from src
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
@@ -357,7 +356,7 @@ async def validate_contact_operations():
         
         # Verify that the returned contact has the correct ID
         if contact_details.get("id") == contact_id:
-            logger.info(f"Successfully verified contact ID in response")
+            logger.info("Successfully verified contact ID in response")
         else:
             logger.warning(f"Contact ID mismatch: Expected {contact_id}, got {contact_details.get('id')}")
         
@@ -403,7 +402,7 @@ async def validate_error_handling():
         
         try:
             params = {"invalid_param": "value"}
-            contacts = await client.query_contacts(params)
+            await client.query_contacts(params)
             logger.warning("Expected error for invalid parameters, but request succeeded")
         except Exception as e:
             logger.info(f"Correctly caught error for invalid parameters: {e}")
@@ -416,7 +415,7 @@ async def validate_error_handling():
                 "since": "not-a-date",
                 "page_size": 10
             }
-            contacts = await client.query_contacts(params)
+            await client.query_contacts(params)
             logger.warning("Expected error for invalid date format, but request succeeded")
         except Exception as e:
             logger.info(f"Correctly caught error for invalid date format: {e}")

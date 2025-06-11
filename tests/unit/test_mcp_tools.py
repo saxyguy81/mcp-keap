@@ -88,8 +88,8 @@ class TestContactTools:
         """Test search_contacts_by_name tool."""
         context = Context()
         
-        with patch('src.mcp.tools.get_api_client') as mock_get_api:
-            with patch('src.mcp.tools.get_cache_manager') as mock_get_cache:
+        with patch('src.mcp.tools.get_api_client'):
+            with patch('src.mcp.tools.get_cache_manager'):
                 with patch('src.mcp.contact_tools.search_contacts_by_name', new_callable=AsyncMock) as mock_search:
                     mock_contacts = [{"id": 1, "name": "John Doe"}]
                     mock_search.return_value = mock_contacts
@@ -103,8 +103,8 @@ class TestContactTools:
         """Test get_contact_details tool."""
         context = Context()
         
-        with patch('src.mcp.tools.get_api_client') as mock_get_api:
-            with patch('src.mcp.tools.get_cache_manager') as mock_get_cache:
+        with patch('src.mcp.tools.get_api_client'):
+            with patch('src.mcp.tools.get_cache_manager'):
                 with patch('src.mcp.contact_tools.get_contact_details', new_callable=AsyncMock) as mock_get:
                     mock_contact = {"id": 123, "name": "John Doe", "email": "john@example.com"}
                     mock_get.return_value = mock_contact
@@ -122,8 +122,8 @@ class TestTagTools:
         """Test get_tags tool."""
         context = Context()
         
-        with patch('src.mcp.tools.get_api_client') as mock_get_api:
-            with patch('src.mcp.tools.get_cache_manager') as mock_get_cache:
+        with patch('src.mcp.tools.get_api_client'):
+            with patch('src.mcp.tools.get_cache_manager'):
                 with patch('src.mcp.tag_tools.get_tags', new_callable=AsyncMock) as mock_get:
                     mock_tags = [{"id": 1, "name": "VIP"}]
                     mock_get.return_value = mock_tags
@@ -137,8 +137,8 @@ class TestTagTools:
         """Test get_contacts_with_tag tool."""
         context = Context()
         
-        with patch('src.mcp.tools.get_api_client') as mock_get_api:
-            with patch('src.mcp.tools.get_cache_manager') as mock_get_cache:
+        with patch('src.mcp.tools.get_api_client'):
+            with patch('src.mcp.tools.get_cache_manager'):
                 with patch('src.mcp.tag_tools.get_contacts_with_tag', new_callable=AsyncMock) as mock_get:
                     mock_contacts = [{"id": 1, "name": "Tagged Contact"}]
                     mock_get.return_value = mock_contacts
@@ -152,8 +152,8 @@ class TestTagTools:
         """Test get_tag_details tool."""
         context = Context()
         
-        with patch('src.mcp.tools.get_api_client') as mock_get_api:
-            with patch('src.mcp.tools.get_cache_manager') as mock_get_cache:
+        with patch('src.mcp.tools.get_api_client'):
+            with patch('src.mcp.tools.get_cache_manager'):
                 with patch('src.mcp.tag_tools.get_tag_details', new_callable=AsyncMock) as mock_get:
                     mock_tag = {"id": 123, "name": "VIP", "description": "VIP customers"}
                     mock_get.return_value = mock_tag
@@ -167,8 +167,8 @@ class TestTagTools:
         """Test apply_tags_to_contacts tool."""
         context = Context()
         
-        with patch('src.mcp.tools.get_api_client') as mock_get_api:
-            with patch('src.mcp.tools.get_cache_manager') as mock_get_cache:
+        with patch('src.mcp.tools.get_api_client'):
+            with patch('src.mcp.tools.get_cache_manager'):
                 with patch('src.mcp.tag_tools.apply_tags_to_contacts', new_callable=AsyncMock) as mock_apply:
                     mock_result = {"success": True, "applied_count": 2}
                     mock_apply.return_value = mock_result
@@ -182,8 +182,8 @@ class TestTagTools:
         """Test remove_tags_from_contacts tool."""
         context = Context()
         
-        with patch('src.mcp.tools.get_api_client') as mock_get_api:
-            with patch('src.mcp.tools.get_cache_manager') as mock_get_cache:
+        with patch('src.mcp.tools.get_api_client'):
+            with patch('src.mcp.tools.get_cache_manager'):
                 with patch('src.mcp.tag_tools.remove_tags_from_contacts', new_callable=AsyncMock) as mock_remove:
                     mock_result = {"success": True, "removed_count": 2}
                     mock_remove.return_value = mock_result
@@ -197,8 +197,8 @@ class TestTagTools:
         """Test create_tag tool."""
         context = Context()
         
-        with patch('src.mcp.tools.get_api_client') as mock_get_api:
-            with patch('src.mcp.tools.get_cache_manager') as mock_get_cache:
+        with patch('src.mcp.tools.get_api_client'):
+            with patch('src.mcp.tools.get_cache_manager'):
                 with patch('src.mcp.tag_tools.create_tag', new_callable=AsyncMock) as mock_create:
                     mock_tag = {"id": 123, "name": "New Tag"}
                     mock_create.return_value = mock_tag

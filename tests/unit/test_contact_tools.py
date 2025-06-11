@@ -3,7 +3,7 @@ Tests for contact-specific MCP tools.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from src.mcp.contact_tools import (
     list_contacts,
     search_contacts_by_email,
@@ -135,7 +135,7 @@ class TestListContacts:
         mock_context.api_client.get_contacts.return_value = {"contacts": sample_contacts}
         mock_context.cache_manager.get.return_value = None
         
-        result = await list_contacts(
+        await list_contacts(
             mock_context, 
             order_by="given_name", 
             order_direction="DESC"

@@ -8,9 +8,8 @@ and other areas with 0% or very low integration coverage.
 import pytest
 import asyncio
 import tempfile
-import json
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 
 class TestTargetedCoverageBoost:
@@ -186,7 +185,7 @@ class TestTargetedCoverageBoost:
     
     def test_optimization_components_comprehensive_integration(self):
         """Test optimization components with realistic data and scenarios."""
-        from src.mcp.optimization.optimization import QueryOptimizer, QueryMetrics, QueryExecutor
+        from src.mcp.optimization.optimization import QueryOptimizer, QueryMetrics
         from src.mcp.optimization.api_optimization import ApiParameterOptimizer, OptimizationResult
         
         # Test QueryOptimizer with various filter scenarios

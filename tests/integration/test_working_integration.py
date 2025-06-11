@@ -17,7 +17,7 @@ from src.cache.manager import CacheManager
 from src.utils.contact_utils import (
     get_custom_field_value, format_contact_data, 
     process_contact_include_fields, get_primary_email, 
-    get_full_name, get_tag_ids, format_contact_summary
+    get_full_name, get_tag_ids
 )
 from src.utils.filter_utils import (
     apply_complex_filters, filter_by_name_pattern,
@@ -460,7 +460,7 @@ class TestWorkingIntegration:
         for i in range(100):
             contact = sample_contacts[i % len(sample_contacts)]
             primary_email = get_primary_email(contact)
-            custom_field = get_custom_field_value(contact, "7")
+            get_custom_field_value(contact, "7")
             formatted = format_contact_data(contact)
             full_name = get_full_name(contact)
             

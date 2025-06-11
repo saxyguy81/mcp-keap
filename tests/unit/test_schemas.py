@@ -5,7 +5,6 @@ Tests for Pydantic schema definitions.
 import pytest
 from datetime import datetime
 from pydantic import ValidationError
-from typing import List
 
 from src.schemas.definitions import (
     FilterOperator,

@@ -11,7 +11,6 @@ import sys
 import argparse
 import subprocess
 import logging
-import asyncio
 
 # Setup logging
 logging.basicConfig(

@@ -3,12 +3,8 @@
 Check the Keap API directly to search for recent contacts
 """
 
-import sys
-import os
 import requests
-import json
 import configparser
-from datetime import datetime, timedelta
 from pathlib import Path
 from tabulate import tabulate
 
@@ -49,7 +45,7 @@ def search_contacts():
         "Accept": "application/json"
     }
     
-    print(f"Searching for all contacts with first name 'scott'")
+    print("Searching for all contacts with first name 'scott'")
     
     # Query parameters - search for first name
     params = {

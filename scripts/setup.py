@@ -5,12 +5,10 @@ Provides installation, configuration, and maintenance utilities.
 """
 
 import argparse
-import os
 import sys
 import subprocess
-import json
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import List
 
 def run_command(cmd: List[str], description: str, check: bool = True) -> subprocess.CompletedProcess:
     """Run a shell command with error handling."""
@@ -148,19 +146,19 @@ def run_health_check():
         
         # Check if we can import main modules
         try:
-            from src.api.client import KeapApiService
+            import src.api.client
             print("  ✓ API client module")
         except ImportError as e:
             print(f"  ✗ API client module: {e}")
         
         try:
-            from src.cache.manager import CacheManager
+            import src.cache.manager
             print("  ✓ Cache manager module")
         except ImportError as e:
             print(f"  ✗ Cache manager module: {e}")
         
         try:
-            from src.mcp.server import main
+            import src.mcp.server  # noqa: F401
             print("  ✓ MCP server module")
         except ImportError as e:
             print(f"  ✗ MCP server module: {e}")

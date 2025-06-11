@@ -12,10 +12,9 @@ import tempfile
 import json
 import time
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch, mock_open
+from unittest.mock import AsyncMock, patch
 
 from src.api.client import KeapApiService
-from src.cache.manager import CacheManager
 from src.cache.persistent_manager import PersistentCacheManager
 from src.schemas.definitions import Contact, Tag, FilterCondition
 from src.mcp.optimization.optimization import QueryExecutor, QueryOptimizer, QueryMetrics
@@ -380,7 +379,7 @@ class TestFinalCoverageIntegration:
         mock_api_client = AsyncMock()
         mock_cache_manager = AsyncMock()
         
-        executor = QueryExecutor(mock_api_client, mock_cache_manager)
+        QueryExecutor(mock_api_client, mock_cache_manager)
         optimizer = QueryOptimizer()
         
         # Performance test with complex filters

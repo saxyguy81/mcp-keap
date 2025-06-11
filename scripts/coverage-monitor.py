@@ -226,10 +226,10 @@ def main():
     generate_recommendations()
     
     # Summary
-    print(f"\n🎯 Coverage Summary:")
+    print("\n🎯 Coverage Summary:")
     print(f"   Current: {coverage_percent:.1f}%")
-    print(f"   Target:  60.0% (minimum)")
-    print(f"   Goal:    80.0% (excellent)")
+    print("   Target:  60.0% (minimum)")
+    print("   Goal:    80.0% (excellent)")
     
     if coverage_percent >= 80:
         print("   Status:  🎉 Excellent coverage!")

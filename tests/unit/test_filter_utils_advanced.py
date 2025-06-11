@@ -4,7 +4,6 @@ Advanced unit tests for filter utilities - covering missing functionality
 
 import pytest
 from datetime import datetime
-from unittest.mock import patch, MagicMock
 
 from src.utils.filter_utils import (
     apply_complex_filters,

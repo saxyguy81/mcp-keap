@@ -8,11 +8,10 @@ including complex logical operations, optimization analysis, and performance mon
 
 import asyncio
 import json
-from typing import List, Dict, Any
+from typing import Any
 
 # Import MCP tools (would normally be called via MCP protocol)
-from src.mcp.tools import query_contacts_optimized, analyze_query_performance
-from src.utils.filter_utils import validate_filter_conditions, apply_complex_filters
+from src.utils.filter_utils import validate_filter_conditions
 from src.mcp.optimization.api_optimization import ApiParameterOptimizer
 
 

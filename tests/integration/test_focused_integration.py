@@ -21,7 +21,6 @@ from src.mcp.tools import (
     get_available_tools, get_tool_by_name
 )
 from src.api.client import KeapApiService
-from src.cache.manager import CacheManager
 
 
 class TestFocusedIntegration:
