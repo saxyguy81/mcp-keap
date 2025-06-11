@@ -63,16 +63,15 @@ class TestFinalCoverageBoost:
         with patch.dict('os.environ', {'KEAP_API_KEY': 'test_key'}):
             client = KeapApiService()
             
-            # Test close session when no session exists
-            client.session = None
-            await client.close()  # Should not raise error
-            
             # Test diagnostics update methods
-            client._update_diagnostics_success(100, retried=True)
-            client._update_diagnostics_failure("test_error", retried=True)
+            client._update_diagnostics("/test", True, 100.0, was_retry=True)
+            client._update_diagnostics("/test", False, 150.0, was_retry=True, error="test_error")
             
             diagnostics = client.get_diagnostics()
             assert "retried_requests" in diagnostics
+            
+            # Test close session normally
+            await client.close()
 
     def test_api_parameter_optimizer_contains_filtering(self):
         """Test specific contains filtering logic."""
