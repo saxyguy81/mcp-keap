@@ -28,26 +28,105 @@ class KeapMCPServer:
     Keap MCP Server implementation
     """
 
-    def __init__(self, name: str = "keap-mcp"):
+    def __init__(self, name: str = "keap-mcp-server"):
         """Initialize the MCP server
 
         Args:
             name: Server name
         """
+        self.name = name
+        self.version = "1.0.0"
         self.mcp = FastMCP(name)
         self._register_tools()
         self._register_resources()
 
     def _register_tools(self):
-        """Register MCP tools"""
-        # Register tools with the updated FastMCP API
-        self.mcp.add_tool(list_contacts)
-        self.mcp.add_tool(search_contacts_by_email)
-        self.mcp.add_tool(search_contacts_by_name)
-        self.mcp.add_tool(get_tags)
-        self.mcp.add_tool(get_contacts_with_tag)
-        self.mcp.add_tool(set_custom_field_values)
-        self.mcp.add_tool(get_api_diagnostics)
+        """Register MCP tools with proper decorators"""
+        
+        @self.mcp.tool()
+        async def list_contacts(
+            filters=None,
+            limit: int = 200,
+            offset: int = 0,
+            order_by=None,
+            order_direction: str = "ASC",
+            include=None
+        ):
+            """List contacts with optional filtering and pagination.
+            
+            This function now uses the optimized query engine for better performance.
+            For advanced features like performance metrics, use query_contacts_optimized directly.
+            """
+            # Import here to avoid circular imports
+            from src.mcp.tools import query_contacts_optimized
+            from mcp.server.fastmcp import Context
+            
+            # Create a context - for now, use a basic one
+            context = Context()
+            
+            # Use the optimized query function internally but maintain the simple interface
+            result = await query_contacts_optimized(
+                context=context,
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                order_by=order_by,
+                order_direction=order_direction,
+                include=include,
+                enable_optimization=True,
+                return_metrics=False
+            )
+            
+            # Return just the contacts list for backward compatibility
+            return result["contacts"]
+
+        @self.mcp.tool()
+        async def search_contacts_by_email(email: str):
+            """Search for contacts by email address."""
+            from src.mcp.tools import search_contacts_by_email as _search
+            from mcp.server.fastmcp import Context
+            context = Context()
+            return await _search(context, email)
+
+        @self.mcp.tool()
+        async def search_contacts_by_name(name: str, limit: int = 50):
+            """Search for contacts by name."""
+            from src.mcp.tools import search_contacts_by_name as _search
+            from mcp.server.fastmcp import Context
+            context = Context()
+            return await _search(context, name, limit)
+
+        @self.mcp.tool()
+        async def get_tags(category_id=None, limit: int = 200):
+            """Get available tags, optionally filtered by category."""
+            from src.mcp.tools import get_tags as _get_tags
+            from mcp.server.fastmcp import Context
+            context = Context()
+            return await _get_tags(context, category_id, limit)
+
+        @self.mcp.tool()
+        async def get_contacts_with_tag(tag_id: int, limit: int = 200):
+            """Get contacts that have a specific tag."""
+            from src.mcp.tools import get_contacts_with_tag as _get
+            from mcp.server.fastmcp import Context
+            context = Context()
+            return await _get(context, tag_id, limit)
+
+        @self.mcp.tool()
+        async def set_custom_field_values(contact_id: int, field_values):
+            """Set custom field values for a contact."""
+            from src.mcp.tools import set_custom_field_values as _set
+            from mcp.server.fastmcp import Context
+            context = Context()
+            return await _set(context, contact_id, field_values)
+
+        @self.mcp.tool()
+        async def get_api_diagnostics():
+            """Get API client diagnostics and health information."""
+            from src.mcp.tools import get_api_diagnostics as _diag
+            from mcp.server.fastmcp import Context
+            context = Context()
+            return await _diag(context)
 
     def _register_resources(self):
         """Register MCP resources"""
@@ -251,6 +330,10 @@ class KeapMCPServer:
             }
 
             return json.dumps(capabilities, indent=2)
+
+    def list_tools(self):
+        """List all registered tools"""
+        return self.mcp.list_tools()
 
     def run(self, host: str = "127.0.0.1", port: int = 5000):
         """Run the MCP server
