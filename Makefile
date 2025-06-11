@@ -63,6 +63,9 @@ clean:  ## Clean generated files
 coverage-80:  ## Ensure 80%+ coverage
 	python -m pytest tests/unit/ --cov=src --cov-fail-under=80 --cov-report=term-missing
 
+coverage-90:  ## Ensure 90%+ coverage (minimum requirement)
+	python -m pytest tests/unit/ --cov=src --cov-fail-under=90 --cov-report=term-missing
+
 coverage-check:  ## Check current coverage percentage
 	python -m pytest tests/unit/ --cov=src --cov-report=term | grep "^TOTAL" || echo "No coverage data"
 
@@ -103,7 +106,7 @@ setup-ci:  ## Set up CI dependencies
 	@echo "✅ CI dependencies installed"
 
 # Development quality checks
-quality-check: lint coverage-80  ## Run full quality check
+quality-check: lint coverage-90  ## Run full quality check
 	@echo "🎉 Quality check completed"
 
 pre-commit-check: clean lint coverage-check  ## Quick pre-commit verification

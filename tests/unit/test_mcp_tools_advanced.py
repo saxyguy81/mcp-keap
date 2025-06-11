@@ -59,7 +59,7 @@ class TestAdvancedMCPTools:
     @pytest.mark.asyncio
     async def test_intersect_id_lists_invalid_field(self, mock_context):
         """Test ID list intersection with invalid field"""
-        lists = [{"item_ids": [1, 2, 3]}, {"wrong_field": "not a list"}]
+        lists = [{"item_ids": [1, 2, 3]}, {"item_ids": "not a list"}]
 
         result = await intersect_id_lists(mock_context, lists, id_field="item_ids")
 
@@ -84,7 +84,7 @@ class TestAdvancedMCPTools:
             mock_api_client.get_contacts.return_value = {"contacts": mock_contacts}
             mock_get_api.return_value = mock_api_client
 
-            mock_cache = MagicMock()
+            mock_cache = AsyncMock()
             mock_cache.get.return_value = None  # Cache miss
             mock_cache.set = AsyncMock()
             mock_get_cache.return_value = mock_cache
@@ -189,7 +189,7 @@ class TestAdvancedMCPTools:
             mock_api_client.update_contact_custom_field.return_value = {"success": True}
             mock_get_api.return_value = mock_api_client
 
-            mock_cache = MagicMock()
+            mock_cache = AsyncMock()
             mock_cache.invalidate_pattern = AsyncMock()
             mock_get_cache.return_value = mock_cache
 

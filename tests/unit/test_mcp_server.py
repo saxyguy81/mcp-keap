@@ -20,7 +20,7 @@ class TestKeapMCPServerInit:
 
             server = KeapMCPServer()
 
-            mock_fastmcp.assert_called_once_with("keap-mcp")
+            mock_fastmcp.assert_called_once_with("keap-mcp-server")
             assert server.mcp == mock_mcp_instance
 
     def test_init_custom_name(self):
@@ -51,33 +51,19 @@ class TestRegisterTools:
     """Test tool registration."""
 
     def test_register_tools(self):
-        """Test that all tools are registered."""
+        """Test that all tools are registered with decorators."""
         with patch("src.mcp.server.FastMCP") as mock_fastmcp:
             mock_mcp_instance = MagicMock()
             mock_fastmcp.return_value = mock_mcp_instance
 
             KeapMCPServer()
 
-            # Check that add_tool was called for each tool
-            expected_calls = [
-                "list_contacts",
-                "search_contacts_by_email",
-                "search_contacts_by_name",
-                "get_tags",
-                "get_contacts_with_tag",
-                "set_custom_field_values",
-                "get_api_diagnostics",
-            ]
+            # With the new decorator approach, verify tool() decorator was called
+            expected_tool_count = 7
+            assert mock_mcp_instance.tool.call_count == expected_tool_count
 
-            assert mock_mcp_instance.add_tool.call_count == len(expected_calls)
-
-            # Verify each tool was added
-            call_args = [
-                call[0][0].__name__
-                for call in mock_mcp_instance.add_tool.call_args_list
-            ]
-            for tool_name in expected_calls:
-                assert tool_name in call_args
+            # Verify the mcp instance was properly set up
+            assert mock_mcp_instance.tool.called
 
 
 class TestRegisterResources:

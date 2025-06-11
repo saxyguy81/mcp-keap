@@ -69,17 +69,21 @@ class TestContactTools:
                 "src.mcp.tools.get_cache_manager", return_value=mock_cache_manager
             ):
                 with patch(
-                    "src.mcp.contact_tools.list_contacts", new_callable=AsyncMock
-                ) as mock_list:
+                    "src.mcp.tools.query_contacts_optimized", new_callable=AsyncMock
+                ) as mock_query:
                     mock_contacts = [{"id": 1, "name": "Test"}]
-                    mock_list.return_value = mock_contacts
+                    mock_query.return_value = {"contacts": mock_contacts}
 
                     result = await list_contacts(context, limit=50)
 
                     assert result == mock_contacts
-                    # Verify that dependencies are created via factory functions
-                    mock_list.assert_called_once()
-                    # The context doesn't get modified since we use ContextWithDeps internally
+                    # Verify that the optimized query was called
+                    mock_query.assert_called_once()
+                    # Check that it was called with correct parameters
+                    call_args = mock_query.call_args
+                    assert call_args[1]["limit"] == 50
+                    assert call_args[1]["enable_optimization"] is True
+                    assert call_args[1]["return_metrics"] is False
 
     @pytest.mark.asyncio
     async def test_search_contacts_by_email(self):
