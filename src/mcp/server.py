@@ -10,16 +10,6 @@ import json
 
 from fastmcp import FastMCP
 
-from src.mcp.tools import (
-    list_contacts,
-    search_contacts_by_email,
-    search_contacts_by_name,
-    get_tags,
-    get_contacts_with_tag,
-    set_custom_field_values,
-    get_api_diagnostics,
-)
-
 logger = logging.getLogger(__name__)
 
 
