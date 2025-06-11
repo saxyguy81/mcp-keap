@@ -42,26 +42,26 @@ async def list_contacts(
     order_direction: str = "ASC",
     include: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
-    """List contacts with optional filtering and pagination."""
-    from src.mcp.contact_tools import list_contacts as _list_contacts
+    """List contacts with optional filtering and pagination.
     
-    # Create a context-like object with required dependencies
-    class ContextWithDeps:
-        def __init__(self):
-            self.api_client = get_api_client()
-            self.cache_manager = get_cache_manager()
-    
-    ctx = ContextWithDeps()
-    
-    return await _list_contacts(
-        context=ctx,
+    This function now uses the optimized query engine for better performance.
+    For advanced features like performance metrics, use query_contacts_optimized directly.
+    """
+    # Use the optimized query function internally but maintain the simple interface
+    result = await query_contacts_optimized(
+        context=context,
         filters=filters,
         limit=limit,
         offset=offset,
         order_by=order_by,
         order_direction=order_direction,
-        include=include
+        include=include,
+        enable_optimization=True,
+        return_metrics=False
     )
+    
+    # Return just the contacts list for backward compatibility
+    return result["contacts"]
 
 
 async def get_tags(

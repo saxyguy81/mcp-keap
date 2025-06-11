@@ -1,6 +1,6 @@
 # Keap MCP Server
 
-[![Coverage](https://img.shields.io/badge/coverage-85%25-green.svg)](https://github.com/yourusername/keapmcp/actions)
+[![Coverage](https://img.shields.io/badge/coverage-55%25-yellow.svg)](https://github.com/yourusername/keapmcp/actions)
 [![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11-blue.svg)](https://github.com/yourusername/keapmcp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -45,13 +45,13 @@ The Keap MCP Server uses a streamlined, high-performance architecture:
 The server exposes 17 comprehensive MCP tools:
 
 ### Contact Operations
-1. `list_contacts` - List contacts with filtering and pagination
+1. `list_contacts` - List contacts with filtering and pagination (now optimized)
 2. `search_contacts_by_email` - Find contacts by email address
 3. `search_contacts_by_name` - Find contacts by name
 4. `get_contact_details` - Get detailed information about a specific contact
 5. `query_contacts_by_custom_field` - Query contacts by custom field value
 
-### Tag Operations
+### Tag Operations  
 6. `get_tags` - Retrieve tags with optional filtering
 7. `get_tag_details` - Get detailed information about a specific tag
 8. `get_contacts_with_tag` - Get contacts that have a specific tag
@@ -65,7 +65,7 @@ The server exposes 17 comprehensive MCP tools:
 ### Custom Field Management
 13. `set_custom_field_values` - Bulk update custom field values across multiple contacts
 
-### Advanced Query Operations  
+### Advanced Query & Performance Operations
 14. `query_contacts_optimized` - Advanced contact query with optimization and performance analytics
 15. `analyze_query_performance` - Analyze query performance and optimization potential
 
@@ -79,7 +79,7 @@ The server exposes 17 comprehensive MCP tools:
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.9 or higher
 - Keap API credentials
 
 ### Installation
@@ -167,11 +167,12 @@ The project includes automated testing and coverage reporting:
 
 ### Coverage Requirements
 
-- **Current Coverage**: 85% overall, 100% on critical components
-- **API Client**: Focused on core functionality (integration tests required for full coverage)
-- **MCP Tools**: Core functionality covered (mocking external dependencies)
-- **Cache System**: 96% coverage with comprehensive persistence testing
-- **Utilities**: 100% coverage for contact processing and filtering
+- **Current Coverage**: 55% integration coverage, varies by component
+- **API Client**: Core functionality tested with comprehensive mocking
+- **MCP Tools**: Integration tests with mock dependencies 
+- **Cache System**: Comprehensive persistence and performance testing
+- **Utilities**: Contact processing and filtering functionality tested
+- **Optimization**: Performance analytics and query optimization covered
 
 ### Running Specific Tests
 
@@ -188,7 +189,7 @@ python -m pytest tests/integration/ -v
 
 ## Using the MCP Server
 
-### Example: List Contacts
+### Example: List Contacts (Now Optimized)
 
 ```json
 {
@@ -202,6 +203,8 @@ python -m pytest tests/integration/ -v
   }
 }
 ```
+
+*Note: `list_contacts` now uses the optimization engine internally for better performance. For detailed performance metrics, use `query_contacts_optimized` directly.*
 
 ### Example: Search by Email
 

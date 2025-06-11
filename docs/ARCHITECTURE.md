@@ -22,7 +22,7 @@ The Keap MCP (Model Context Protocol) service provides a streamlined, production
                                 │
 ┌─────────────────────────────────────────────────────────────┐
 │                  MCP Tools Layer                          │
-│         contact_tools.py │ tag_tools.py                   │
+│      contact_tools.py │ tag_tools.py │ optimization/       │
 └─────────────────────────────────────────────────────────────┘
                                 │
 ┌─────────────────────────────────────────────────────────────┐
@@ -44,17 +44,30 @@ The Keap MCP (Model Context Protocol) service provides a streamlined, production
 ### MCP Tools (`src/mcp/tools.py`)
 **Tool Interface Layer**
 
-- Unified interface for all 5 MCP tools
+- Unified interface for all 17 MCP tools
 - Context management for shared components
 - Tool parameter validation and processing
 - Integration with contact and tag tools
+- Optimization engine integration
 
 **Available Tools:**
-1. `list_contacts` - Contact listing with filtering and pagination
+1. `list_contacts` - Contact listing with filtering and pagination (optimized)
 2. `get_tags` - Tag retrieval with optional filtering
 3. `search_contacts_by_email` - Email-based contact search
 4. `search_contacts_by_name` - Name-based contact search  
 5. `get_contacts_with_tag` - Tag-based contact filtering
+6. `modify_tags` - Add or remove tags from contacts
+7. `get_contact_details` - Detailed contact information
+8. `get_tag_details` - Detailed tag information
+9. `apply_tags_to_contacts` - Batch tag application
+10. `remove_tags_from_contacts` - Batch tag removal
+11. `create_tag` - Tag creation
+12. `intersect_id_lists` - ID list intersection utility
+13. `query_contacts_by_custom_field` - Custom field queries
+14. `query_contacts_optimized` - Advanced optimized queries
+15. `analyze_query_performance` - Performance analysis
+16. `set_custom_field_values` - Bulk custom field updates
+17. `get_api_diagnostics` - System diagnostics
 
 ### Contact Tools (`src/mcp/contact_tools.py`)
 **Contact-Specific Operations**
@@ -71,6 +84,15 @@ The Keap MCP (Model Context Protocol) service provides a streamlined, production
 - Contact-tag relationship queries
 - Tag metadata retrieval
 - Category-aware operations
+
+### Optimization Engine (`src/mcp/optimization/`)
+**Query Optimization and Performance Analytics**
+
+- **QueryExecutor**: Intelligent query strategy selection and execution
+- **QueryOptimizer**: Performance analysis and strategy recommendation  
+- **ApiParameterOptimizer**: API parameter optimization for different query types
+- **Performance Metrics**: Detailed analytics for query optimization and monitoring
+- **Strategy Selection**: Adaptive learning for optimal query execution paths
 
 ### API Client (`src/api/client.py`)
 **Keap API Communication**
@@ -183,9 +205,10 @@ CACHE_DB_PATH=keap_cache.db
 ## Testing Strategy
 
 ### Test Coverage
-- **Unit Tests**: Individual component testing (100% coverage)
-- **Integration Tests**: End-to-end workflow validation
+- **Unit Tests**: Individual component testing with comprehensive mocking
+- **Integration Tests**: End-to-end workflow validation (55% coverage)
 - **API Validation**: Real Keap API interaction testing
+- **Performance Tests**: Optimization engine and cache performance validation
 
 ### Test Categories
 - `tests/unit/` - Component-level testing

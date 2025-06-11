@@ -8,7 +8,9 @@ The Keap MCP service provides a streamlined interface for interacting with Keap 
 
 ### 1. list_contacts
 
-List contacts from Keap CRM with optional filtering and pagination.
+List contacts from Keap CRM with optional filtering and pagination. 
+
+*Note: This function now uses the optimization engine internally for better performance. For detailed performance metrics, use `query_contacts_optimized` directly.*
 
 #### Parameters
 
@@ -323,13 +325,15 @@ KEAP_MCP_CACHE_TTL=3600
 
 ### Programmatic Configuration
 
+Configuration is handled through environment variables. Access them directly in your application:
+
 ```python
-from src.utils.config import get_config
+import os
 
 # Access configuration
-config = get_config()
-api_key = config.get("KEAP_API_KEY")
-cache_enabled = config.get("KEAP_MCP_CACHE_ENABLED", True)
+api_key = os.getenv("KEAP_API_KEY")
+cache_enabled = os.getenv("KEAP_MCP_CACHE_ENABLED", "true").lower() == "true"
+cache_ttl = int(os.getenv("KEAP_MCP_CACHE_TTL", "3600"))
 ```
 
 ## Performance Best Practices
