@@ -317,7 +317,35 @@ class QueryExecutor:
     async def _execute_hybrid(self, query_type: str, filters: List[Dict[str, Any]], 
                             limit: int, offset: int, **kwargs) -> Tuple[List[Dict[str, Any]], int, int, int]:
         """Execute with hybrid server/client optimization."""
-        return await self._execute_server_optimized(query_type, filters, limit, offset, **kwargs)
+        # Use API optimizer for hybrid strategy
+        optimization_result = self.api_optimizer.optimize_contact_query_parameters(filters, limit)
+        
+        # Execute with server-side filters
+        server_filters = optimization_result.server_side_filters or []
+        client_filters = optimization_result.client_side_filters or []
+        
+        if query_type == 'list_contacts':
+            # Build server parameters from server-side filters
+            from src.utils.filter_utils import optimize_filters_for_api
+            server_params, remaining_client_filters = optimize_filters_for_api(server_filters)
+            
+            # Execute API call
+            params = {'limit': limit, 'offset': offset, **server_params}
+            response = await self.api_client.get_contacts(**params)
+            results = response.get('contacts', [])
+            
+            # Apply client-side filters
+            all_client_filters = client_filters + remaining_client_filters
+            if all_client_filters:
+                results = await self._apply_client_side_filters(results, all_client_filters)
+        else:
+            results = []
+            
+        api_calls = 1
+        server_filters_count = len(server_filters)
+        client_filters_count = len(client_filters)
+        
+        return results, api_calls, server_filters_count, client_filters_count
     
     async def _execute_bulk_retrieve(self, query_type: str, filters: List[Dict[str, Any]], 
                                    limit: int, offset: int, **kwargs) -> Tuple[List[Dict[str, Any]], int, int, int]:

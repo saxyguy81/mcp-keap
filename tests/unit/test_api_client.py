@@ -8,7 +8,13 @@ import pytest
 import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.api.client import KeapApiService
+from src.api.client import (
+    KeapApiService, 
+    create_keap_client, 
+    create_keap_v2_client,
+    KeapClient,
+    KeapV2Client
+)
 
 
 class TestKeapApiServiceInit:
@@ -145,8 +151,8 @@ class TestDiagnostics:
         assert diagnostics["total_requests"] == 1
 
 
-class TestHttpMethods:
-    """Test HTTP method implementations."""
+class TestSessionManagement:
+    """Test session management functionality."""
     
     @pytest.mark.asyncio
     async def test_close_session(self):
@@ -447,6 +453,469 @@ class TestTagMethods:
             mock_post.assert_called_once_with('/tags', tag_data)
 
 
+class TestHttpMethods:
+    """Test HTTP method implementations."""
+    
+    @pytest.mark.asyncio
+    async def test_get_method(self):
+        """Test GET method."""
+        client = KeapApiService(api_key="test_key")
+        
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"data": "test"}
+        
+        with patch.object(client, '_make_request', new_callable=AsyncMock) as mock_make_request:
+            mock_make_request.return_value = mock_response
+            
+            result = await client.get('/test', {'param': 'value'})
+            
+            assert result == {"data": "test"}
+            mock_make_request.assert_called_once_with("GET", "/test", params={'param': 'value'})
+    
+    @pytest.mark.asyncio
+    async def test_post_method(self):
+        """Test POST method."""
+        client = KeapApiService(api_key="test_key")
+        
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": 123}
+        
+        with patch.object(client, '_make_request', new_callable=AsyncMock) as mock_make_request:
+            mock_make_request.return_value = mock_response
+            
+            result = await client.post('/test', {'name': 'test'})
+            
+            assert result == {"id": 123}
+            mock_make_request.assert_called_once_with("POST", "/test", json={'name': 'test'})
+    
+    @pytest.mark.asyncio
+    async def test_put_method(self):
+        """Test PUT method."""
+        client = KeapApiService(api_key="test_key")
+        
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"updated": True}
+        
+        with patch.object(client, '_make_request', new_callable=AsyncMock) as mock_make_request:
+            mock_make_request.return_value = mock_response
+            
+            result = await client.put('/test', {'name': 'updated'})
+            
+            assert result == {"updated": True}
+            mock_make_request.assert_called_once_with("PUT", "/test", json={'name': 'updated'})
+    
+    @pytest.mark.asyncio
+    async def test_patch_method(self):
+        """Test PATCH method."""
+        client = KeapApiService(api_key="test_key")
+        
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"patched": True}
+        
+        with patch.object(client, '_make_request', new_callable=AsyncMock) as mock_make_request:
+            mock_make_request.return_value = mock_response
+            
+            result = await client.patch('/test', {'field': 'value'})
+            
+            assert result == {"patched": True}
+            mock_make_request.assert_called_once_with("PATCH", "/test", json={'field': 'value'})
+    
+    @pytest.mark.asyncio
+    async def test_delete_method_with_content(self):
+        """Test DELETE method with content."""
+        client = KeapApiService(api_key="test_key")
+        
+        mock_response = MagicMock()
+        mock_response.content = b'{"deleted": true}'
+        mock_response.json.return_value = {"deleted": True}
+        
+        with patch.object(client, '_make_request', new_callable=AsyncMock) as mock_make_request:
+            mock_make_request.return_value = mock_response
+            
+            result = await client.delete('/test')
+            
+            assert result == {"deleted": True}
+            mock_make_request.assert_called_once_with("DELETE", "/test")
+    
+    @pytest.mark.asyncio
+    async def test_delete_method_no_content(self):
+        """Test DELETE method with no content."""
+        client = KeapApiService(api_key="test_key")
+        
+        mock_response = MagicMock()
+        mock_response.content = b''
+        
+        with patch.object(client, '_make_request', new_callable=AsyncMock) as mock_make_request:
+            mock_make_request.return_value = mock_response
+            
+            result = await client.delete('/test')
+            
+            assert result == {}
+            mock_make_request.assert_called_once_with("DELETE", "/test")
+
+
+class TestPagination:
+    """Test pagination functionality."""
+    
+    @pytest.mark.asyncio
+    async def test_get_paginated_contacts(self):
+        """Test paginated retrieval with contacts format."""
+        client = KeapApiService(api_key="test_key")
+        
+        # Mock responses for multiple pages - need full page size to continue
+        page1 = {"contacts": [{"id": i} for i in range(1, 201)]}  # 200 items (full page)
+        page2 = {"contacts": [{"id": i} for i in range(201, 203)]}  # 2 items (partial page)
+        
+        with patch.object(client, 'get', new_callable=AsyncMock) as mock_get:
+            mock_get.side_effect = [page1, page2]
+            
+            result = await client.get_paginated('/contacts', {'filter': 'test'})
+            
+            assert len(result) == 202
+            assert result[0]["id"] == 1
+            assert result[201]["id"] == 202
+            assert mock_get.call_count == 2
+    
+    @pytest.mark.asyncio
+    async def test_get_paginated_tags(self):
+        """Test paginated retrieval with tags format."""
+        client = KeapApiService(api_key="test_key")
+        
+        # Small page - will stop immediately because < page_size (200)
+        page1 = {"tags": [{"id": 1}, {"id": 2}]}
+        
+        with patch.object(client, 'get', new_callable=AsyncMock) as mock_get:
+            mock_get.side_effect = [page1]
+            
+            result = await client.get_paginated('/tags')
+            
+            assert len(result) == 2
+            assert result[0]["id"] == 1
+            assert mock_get.call_count == 1
+    
+    @pytest.mark.asyncio
+    async def test_get_paginated_data_format(self):
+        """Test paginated retrieval with data format."""
+        client = KeapApiService(api_key="test_key")
+        
+        page1 = {"data": [{"id": 1}, {"id": 2}]}
+        page2 = {"data": []}
+        
+        with patch.object(client, 'get', new_callable=AsyncMock) as mock_get:
+            mock_get.side_effect = [page1, page2]
+            
+            result = await client.get_paginated('/custom')
+            
+            assert len(result) == 2
+            assert result[0]["id"] == 1
+    
+    @pytest.mark.asyncio
+    async def test_get_paginated_list_format(self):
+        """Test paginated retrieval with direct list format."""
+        client = KeapApiService(api_key="test_key")
+        
+        page1 = [{"id": 1}, {"id": 2}]
+        page2 = []
+        
+        with patch.object(client, 'get', new_callable=AsyncMock) as mock_get:
+            mock_get.side_effect = [page1, page2]
+            
+            result = await client.get_paginated('/list')
+            
+            assert len(result) == 2
+            assert result[0]["id"] == 1
+    
+    @pytest.mark.asyncio
+    async def test_get_paginated_with_limit(self):
+        """Test paginated retrieval with user-specified limit."""
+        client = KeapApiService(api_key="test_key")
+        
+        page1 = {"contacts": [{"id": 1}, {"id": 2}, {"id": 3}]}
+        
+        with patch.object(client, 'get', new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = page1
+            
+            result = await client.get_paginated('/contacts', limit=2)
+            
+            assert len(result) == 2
+            assert result[0]["id"] == 1
+            assert result[1]["id"] == 2
+    
+    @pytest.mark.asyncio
+    async def test_get_paginated_fallback_format(self):
+        """Test paginated retrieval with fallback to empty list."""
+        client = KeapApiService(api_key="test_key")
+        
+        response = {"unknown_format": "data"}
+        
+        with patch.object(client, 'get', new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = response
+            
+            result = await client.get_paginated('/unknown')
+            
+            assert result == []
+
+
+class TestSearchMethods:
+    """Test search functionality."""
+    
+    @pytest.mark.asyncio
+    async def test_search_contacts(self):
+        """Test contact search functionality."""
+        client = KeapApiService(api_key="test_key")
+        
+        mock_result = {"contacts": [{"id": 1, "email": "test@example.com"}]}
+        
+        with patch.object(client, 'get', new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_result
+            
+            result = await client.search_contacts("test@example.com", limit=50)
+            
+            expected_params = {
+                'email': 'test@example.com',
+                'given_name': 'test@example.com',
+                'family_name': 'test@example.com',
+                'limit': 50
+            }
+            
+            assert result == mock_result
+            mock_get.assert_called_once_with('/contacts', expected_params)
+    
+    @pytest.mark.asyncio
+    async def test_get_contacts_by_tag(self):
+        """Test getting contacts by tag."""
+        client = KeapApiService(api_key="test_key")
+        
+        mock_contacts = [{"id": 1, "tag_ids": ["123"]}, {"id": 2, "tag_ids": ["123"]}]
+        
+        with patch.object(client, 'get_paginated', new_callable=AsyncMock) as mock_paginated:
+            mock_paginated.return_value = mock_contacts
+            
+            result = await client.get_contacts_by_tag("123", limit=100)
+            
+            assert result == mock_contacts
+            mock_paginated.assert_called_once_with('/contacts', 
+                                                  params={'tag_id': '123'}, 
+                                                  limit=100)
+
+
+class TestTagOperations:
+    """Test tag operation methods."""
+    
+    @pytest.mark.asyncio
+    async def test_apply_tag_to_contact_v1(self):
+        """Test applying tag to contact with v1 API."""
+        client = KeapApiService(api_key="test_key", api_version="v1")
+        
+        mock_result = {"success": True}
+        
+        with patch.object(client, 'post', new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_result
+            
+            result = await client.apply_tag_to_contact("123", "456")
+            
+            assert result == mock_result
+            mock_post.assert_called_once_with('/contacts/123/tags', {'tagId': '456'})
+    
+    @pytest.mark.asyncio
+    async def test_apply_tag_to_contact_v2(self):
+        """Test applying tag to contact with v2 API."""
+        client = KeapApiService(api_key="test_key", api_version="v2")
+        
+        mock_result = {"success": True}
+        
+        with patch.object(client, 'apply_tags_to_contacts', new_callable=AsyncMock) as mock_batch:
+            mock_batch.return_value = mock_result
+            
+            result = await client.apply_tag_to_contact("123", "456")
+            
+            assert result == mock_result
+            mock_batch.assert_called_once_with(['456'], ['123'])
+    
+    @pytest.mark.asyncio
+    async def test_remove_tag_from_contact(self):
+        """Test removing tag from contact."""
+        client = KeapApiService(api_key="test_key")
+        
+        mock_result = {"success": True}
+        
+        with patch.object(client, 'delete', new_callable=AsyncMock) as mock_delete:
+            mock_delete.return_value = mock_result
+            
+            result = await client.remove_tag_from_contact("123", "456")
+            
+            assert result == mock_result
+            mock_delete.assert_called_once_with('/contacts/123/tags/456')
+    
+    @pytest.mark.asyncio
+    async def test_apply_tags_to_contacts_v2(self):
+        """Test batch applying tags to contacts with v2 API."""
+        client = KeapApiService(api_key="test_key", api_version="v2")
+        
+        mock_result = {"success": True, "operations": 4}
+        
+        with patch.object(client, 'post', new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_result
+            
+            result = await client.apply_tags_to_contacts(["1", "2"], ["101", "102"])
+            
+            expected_data = {
+                'tagIds': ["1", "2"],
+                'contactIds': ["101", "102"]
+            }
+            
+            assert result == mock_result
+            mock_post.assert_called_once_with('/contacts/tags', expected_data)
+    
+    @pytest.mark.asyncio
+    async def test_apply_tags_to_contacts_v1_error(self):
+        """Test that batch tag operations fail with v1 API."""
+        client = KeapApiService(api_key="test_key", api_version="v1")
+        
+        with pytest.raises(ValueError, match="Batch tag operations require API v2"):
+            await client.apply_tags_to_contacts(["1"], ["101"])
+
+
+class TestCacheOperations:
+    """Test cache functionality."""
+    
+    def test_clear_cache(self):
+        """Test cache clearing functionality."""
+        client = KeapApiService(api_key="test_key")
+        
+        # Set up cache data
+        client._tag_cache = {"tags": [{"id": 1}]}
+        client._tag_cache_timestamp = time.time()
+        
+        assert client._tag_cache != {}
+        assert client._tag_cache_timestamp != 0
+        
+        client.clear_cache()
+        
+        assert client._tag_cache == {}
+        assert client._tag_cache_timestamp == 0
+
+
+class TestErrorHandling:
+    """Test enhanced error handling scenarios."""
+    
+    @pytest.mark.asyncio
+    async def test_make_request_timeout_exhausts_retries(self):
+        """Test that timeout errors exhaust retries properly."""
+        client = KeapApiService(api_key="test_key")
+        client.max_retries = 2
+        
+        with patch.object(client.session, 'request', new_callable=AsyncMock) as mock_request:
+            with patch('asyncio.sleep', new_callable=AsyncMock):
+                mock_request.side_effect = httpx.TimeoutException("Timeout")
+                
+                with pytest.raises(httpx.TimeoutException):
+                    await client._make_request("GET", "/test")
+                
+                # Should be called max_retries + 1 times
+                assert mock_request.call_count == 3
+    
+    @pytest.mark.asyncio
+    async def test_make_request_unexpected_exception(self):
+        """Test handling of unexpected exceptions."""
+        client = KeapApiService(api_key="test_key")
+        client.max_retries = 1
+        
+        with patch.object(client.session, 'request', new_callable=AsyncMock) as mock_request:
+            with patch('asyncio.sleep', new_callable=AsyncMock):
+                mock_request.side_effect = RuntimeError("Unexpected error")
+                
+                with pytest.raises(RuntimeError, match="Unexpected error"):
+                    await client._make_request("GET", "/test")
+                
+                assert mock_request.call_count == 2  # max_retries + 1
+    
+    @pytest.mark.asyncio
+    async def test_make_request_5xx_error_success_after_retry(self):
+        """Test 5xx errors succeed after retry."""
+        client = KeapApiService(api_key="test_key")
+        
+        mock_error_response = MagicMock()
+        mock_error_response.status_code = 503
+        mock_error_response.headers = {}
+        
+        mock_success_response = MagicMock()
+        mock_success_response.status_code = 200
+        mock_success_response.headers = {}
+        
+        with patch.object(client.session, 'request', new_callable=AsyncMock) as mock_request:
+            with patch('asyncio.sleep', new_callable=AsyncMock):
+                mock_request.side_effect = [mock_error_response, mock_success_response]
+                
+                response = await client._make_request("GET", "/test")
+                
+                assert response == mock_success_response
+                assert mock_request.call_count == 2
+    
+    @pytest.mark.asyncio
+    async def test_make_request_other_status_codes(self):
+        """Test handling of other status codes."""
+        client = KeapApiService(api_key="test_key")
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 418  # I'm a teapot
+        mock_response.headers = {}
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "I'm a teapot", request=MagicMock(), response=mock_response
+        )
+        
+        with patch.object(client.session, 'request', new_callable=AsyncMock) as mock_request:
+            mock_request.return_value = mock_response
+            
+            with pytest.raises(httpx.HTTPStatusError):
+                await client._make_request("GET", "/test")
+
+
+class TestFactoryFunctions:
+    """Test factory functions and backward compatibility."""
+    
+    def test_create_keap_client(self):
+        """Test create_keap_client factory function."""
+        with patch.dict(os.environ, {"KEAP_API_KEY": "test_key"}):
+            client = create_keap_client()
+            
+            assert isinstance(client, KeapApiService)
+            assert client.api_version == "v1"
+            assert client.api_key == "test_key"
+    
+    def test_create_keap_client_with_key(self):
+        """Test create_keap_client with explicit API key."""
+        client = create_keap_client("explicit_key")
+        
+        assert isinstance(client, KeapApiService)
+        assert client.api_version == "v1"
+        assert client.api_key == "explicit_key"
+    
+    def test_create_keap_v2_client(self):
+        """Test create_keap_v2_client factory function."""
+        with patch.dict(os.environ, {"KEAP_API_KEY": "test_key"}):
+            client = create_keap_v2_client()
+            
+            assert isinstance(client, KeapApiService)
+            assert client.api_version == "v2"
+            assert client.api_key == "test_key"
+    
+    def test_keap_client_alias(self):
+        """Test KeapClient backward compatibility alias."""
+        client = KeapClient(api_key="test_key")
+        
+        assert isinstance(client, KeapApiService)
+        assert client.api_key == "test_key"
+    
+    def test_keap_v2_client_function(self):
+        """Test KeapV2Client backward compatibility function."""
+        client = KeapV2Client(api_key="test_key")
+        
+        assert isinstance(client, KeapApiService)
+        assert client.api_version == "v2"
+        assert client.api_key == "test_key"
+
+
 class TestGetApiInfo:
     """Test API info method."""
     
@@ -460,3 +929,17 @@ class TestGetApiInfo:
         assert info["base_url"] == "https://api.infusionsoft.com/crm/rest/v2"
         assert "rate_limit_remaining" in info
         assert "cache_entries" in info
+        assert "cache_age_seconds" in info
+    
+    def test_get_api_info_with_cache(self):
+        """Test get_api_info with cache data."""
+        client = KeapApiService(api_key="test_key")
+        
+        # Set up cache
+        client._tag_cache = {"tags": [{"id": 1}]}
+        client._tag_cache_timestamp = time.time() - 100
+        
+        info = client.get_api_info()
+        
+        assert info["cache_entries"] == 1
+        assert info["cache_age_seconds"] >= 100

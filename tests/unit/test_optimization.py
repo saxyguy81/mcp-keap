@@ -348,7 +348,7 @@ class TestQueryExecutor:
             with patch.object(executor.api_optimizer, 'optimize_contact_query_parameters', return_value=mock_optimization):
                 with patch('src.utils.contact_utils.get_custom_field_value', return_value="VIP"):
                     with patch('src.utils.contact_utils.format_contact_data', side_effect=lambda x: x):
-                        with patch('time.time', side_effect=[0, 150]):  # 150ms duration
+                        with patch('time.time', side_effect=[0, 0.150]):  # 150ms duration
                             contacts, metrics = await executor.execute_optimized_query(
                                 'list_contacts',
                                 filters=[
@@ -375,6 +375,9 @@ class TestQueryExecutor:
         
         # Mock API exception
         mock_api_client.get_contacts.side_effect = Exception("API Error")
+        
+        # Mock cache miss to ensure we hit the API
+        mock_cache_manager.get.return_value = None
         
         executor = QueryExecutor(mock_api_client, mock_cache_manager)
         

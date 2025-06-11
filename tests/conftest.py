@@ -14,8 +14,14 @@ from pathlib import Path
 from typing import Dict, Any, List
 from unittest.mock import AsyncMock, Mock, patch
 
+from dotenv import load_dotenv
 from src.cache.manager import CacheManager
 from src.api.client import KeapApiService
+
+# Load environment variables from .env file if it exists
+env_file = Path(__file__).parent.parent / ".env"
+if env_file.exists():
+    load_dotenv(env_file)
 
 
 @pytest.fixture(scope="session")
@@ -28,16 +34,29 @@ def event_loop():
 
 @pytest.fixture(scope="session")
 def test_config():
-    """Load test configuration from environment variables"""
+    """Load test configuration from environment variables or .env file"""
     config = {
         "api_key": os.environ.get("KEAP_API_KEY"),
         "base_url": os.environ.get("KEAP_API_BASE_URL", "https://api.infusionsoft.com/crm/rest/v1"),
         "timeout": 30,
-        "max_retries": 3
+        "max_retries": 3,
+        "has_real_api_key": bool(os.environ.get("KEAP_API_KEY"))
     }
     
     if not config["api_key"]:
-        pytest.skip("KEAP_API_KEY not found in environment variables")
+        # Try to provide helpful information about where to set the API key
+        env_file = Path(__file__).parent.parent / ".env"
+        if env_file.exists():
+            pytest.skip(
+                f"KEAP_API_KEY not found in .env file ({env_file}). "
+                f"Please add 'KEAP_API_KEY=your_api_key' to the .env file to run integration tests."
+            )
+        else:
+            pytest.skip(
+                f"KEAP_API_KEY not found. Create a .env file at {env_file} "
+                f"with 'KEAP_API_KEY=your_api_key' or set KEAP_API_KEY environment variable "
+                f"to run integration tests."
+            )
     
     return config
 
@@ -83,6 +102,92 @@ def keap_client(test_config):
         asyncio.create_task(client.close())
     except AttributeError:
         pass
+
+
+@pytest.fixture
+async def integration_client(test_config):
+    """
+    Create a client for integration tests that uses real API if available,
+    otherwise provides a helpful mock with realistic data.
+    """
+    if test_config["has_real_api_key"]:
+        # Use real API client
+        client = KeapApiService(api_key=test_config["api_key"])
+        client._is_mock = False
+        
+        yield client
+        
+        # Async cleanup
+        try:
+            await client.close()
+        except AttributeError:
+            pass
+    else:
+        # Create enhanced mock client with realistic responses
+        client = AsyncMock(spec=KeapApiService)
+        client._is_mock = True
+        
+        # Configure realistic mock responses
+        client.get_contacts.return_value = {
+            "contacts": [
+                {
+                    "id": 1,
+                    "given_name": "John",
+                    "family_name": "Doe",
+                    "email_addresses": [{"field": "EMAIL", "email": "john@example.com", "is_primary": True}],
+                    "phone_numbers": [{"field": "PHONE1", "number": "555-1234"}],
+                    "tag_ids": [1, 2],
+                    "custom_fields": [{"id": 7, "content": "VIP"}],
+                    "date_created": "2024-01-01T10:00:00Z",
+                    "last_updated": "2024-01-15T14:30:00Z"
+                },
+                {
+                    "id": 2,
+                    "given_name": "Jane",
+                    "family_name": "Smith", 
+                    "email_addresses": [{"field": "EMAIL", "email": "jane@example.com", "is_primary": True}],
+                    "tag_ids": [1, 3],
+                    "custom_fields": [{"id": 7, "content": "Regular"}],
+                    "date_created": "2024-01-02T11:00:00Z",
+                    "last_updated": "2024-01-16T15:30:00Z"
+                }
+            ]
+        }
+        
+        client.get_tags.return_value = {
+            "tags": [
+                {"id": 1, "name": "Customer", "description": "Active customer"},
+                {"id": 2, "name": "VIP", "description": "VIP customer"},
+                {"id": 3, "name": "Newsletter", "description": "Newsletter subscriber"}
+            ]
+        }
+        
+        client.get_contact.return_value = {
+            "id": 1,
+            "given_name": "John",
+            "family_name": "Doe",
+            "email_addresses": [{"field": "EMAIL", "email": "john@example.com", "is_primary": True}],
+            "tag_ids": [1, 2]
+        }
+        
+        client.get_tag.return_value = {
+            "id": 1,
+            "name": "Customer",
+            "description": "Active customer"
+        }
+        
+        client.create_contact.return_value = {
+            "id": 999,
+            "given_name": "New",
+            "family_name": "Contact"
+        }
+        
+        client.create_tag.return_value = {
+            "id": 999,
+            "name": "New Tag"
+        }
+        
+        yield client
 
 
 @pytest.fixture
@@ -293,6 +398,8 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "performance: mark test as a performance test")
     config.addinivalue_line("markers", "security: mark test as a security test")
     config.addinivalue_line("markers", "slow: mark test as slow running")
+    config.addinivalue_line("markers", "requires_api_key: mark test as requiring a real API key")
+    config.addinivalue_line("markers", "mock_friendly: mark test as able to run with mock data")
 
 
 def pytest_collection_modifyitems(config, items):
