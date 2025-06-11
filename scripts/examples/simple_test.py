@@ -9,12 +9,7 @@ import json
 # Test the MCP endpoint with a simple request
 response = requests.post(
     "http://localhost:5007/mcp",
-    json={
-        "function": "search_tags",
-        "params": {
-            "name": "Member"
-        }
-    }
+    json={"function": "search_tags", "params": {"name": "Member"}},
 )
 
 print(f"Status code: {response.status_code}")

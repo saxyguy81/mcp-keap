@@ -7,8 +7,4 @@ This module provides sophisticated query optimization strategies for Keap CRM op
 from .optimization import QueryOptimizer, QueryStrategy
 from .api_optimization import ApiParameterOptimizer
 
-__all__ = [
-    'QueryOptimizer',
-    'QueryStrategy', 
-    'ApiParameterOptimizer'
-]
+__all__ = ["QueryOptimizer", "QueryStrategy", "ApiParameterOptimizer"]
