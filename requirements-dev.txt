@@ -6,3 +6,17 @@
 # Essential Development Tools
 pytest-xdist>=3.3.0
 coverage>=7.2.0
+
+# Testing and Quality Assurance
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.21.0
+
+# Code Quality and Security
+ruff>=0.1.0
+mypy>=1.5.0
+bandit[toml]>=1.7.5
+safety>=2.3.0
+
+# Additional Development Tools
+pre-commit>=3.4.0

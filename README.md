@@ -151,12 +151,23 @@ make dev-test
 
 ### CI/CD Integration
 
-The project includes automated testing and coverage reporting:
+The project includes comprehensive automated testing and quality assurance:
 
 - **Continuous Integration**: Tests run on Python 3.9, 3.10, and 3.11
-- **Coverage Tracking**: Minimum 60% coverage enforced
-- **Pre-commit Checks**: Code formatting, linting, and security checks
-- **Coverage Badges**: Automatically updated on main branch
+- **Coverage Tracking**: Minimum 70% unit test coverage enforced
+- **Code Quality**: Ruff linting and formatting checks
+- **Security Scanning**: Bandit security analysis and Safety dependency checks  
+- **Type Checking**: MyPy static type analysis (non-blocking)
+- **Pre-commit Hooks**: Automated code quality checks on commit
+- **Build Verification**: Import and initialization testing
+
+#### CI Pipeline Jobs
+1. **Lint Code**: Ruff linting and formatting validation
+2. **Unit Tests**: Full test suite with coverage reporting across Python versions
+3. **Security Scan**: Bandit and Safety security analysis
+4. **Type Check**: MyPy static type checking
+5. **Build Test**: Package import and server initialization verification
+6. **Coverage Report**: HTML coverage reports for pull requests
 
 ### Test Categories
 
