@@ -65,6 +65,8 @@ filterwarnings = [
     "ignore::UserWarning",
     "ignore::DeprecationWarning", 
     "ignore::pytest.PytestDeprecationWarning",
+    "ignore:.*blake2.*:UserWarning",
+    "ignore:.*blake2.*:ValueError",
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",

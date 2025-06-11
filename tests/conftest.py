@@ -9,11 +9,18 @@ import os
 import pytest
 import asyncio
 import tempfile
+import logging
+import warnings
 from pathlib import Path
 from typing import Dict, Any
 from unittest.mock import AsyncMock
 
 from dotenv import load_dotenv
+
+# Suppress blake2 hash algorithm warnings during tests
+logging.getLogger("root").setLevel(logging.CRITICAL)
+warnings.filterwarnings("ignore", message=".*blake2.*not found.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="hashlib")
 from src.cache.manager import CacheManager
 from src.api.client import KeapApiService
 
@@ -429,6 +436,29 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "mock_friendly: mark test as able to run with mock data"
     )
+    
+    # Suppress blake2 hash algorithm errors
+    import hashlib
+    import logging
+    
+    # Disable logging for the root logger during hashlib initialization
+    root_logger = logging.getLogger()
+    original_level = root_logger.level
+    root_logger.setLevel(logging.CRITICAL)
+    
+    try:
+        # Try to access blake2 algorithms to trigger any errors early
+        hashlib.new('blake2b')
+    except (ValueError, TypeError):
+        pass
+    
+    try:
+        hashlib.new('blake2s')
+    except (ValueError, TypeError):
+        pass
+    
+    # Restore original logging level
+    root_logger.setLevel(original_level)
 
 
 def pytest_collection_modifyitems(config, items):
