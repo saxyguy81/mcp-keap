@@ -14,6 +14,13 @@ import logging
 from datetime import datetime
 import pytest
 import httpx
+from pathlib import Path
+
+# Load environment variables from .env file if it exists
+from dotenv import load_dotenv
+env_file = Path(__file__).parent.parent.parent / ".env"
+if env_file.exists():
+    load_dotenv(env_file)
 
 # Add parent directory to path to import from src
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
