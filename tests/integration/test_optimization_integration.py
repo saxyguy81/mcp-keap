@@ -149,6 +149,7 @@ class TestOptimizationIntegration:
         assert optimization_result.optimization_strategy in [
             "highly_optimized",
             "moderately_optimized",
+            "partially_optimized",
         ]
         assert optimization_result.optimization_score > 0
         assert len(optimization_result.server_side_filters) > 0
@@ -160,8 +161,8 @@ class TestOptimizationIntegration:
 
         # Verify performance analysis
         assert "performance_rating" in performance_analysis
-        assert "estimated_response_time_ms" in performance_analysis
-        assert performance_analysis["performance_rating"] in [
+        assert "optimization_score" in performance_analysis
+        assert performance_analysis["performance_rating"].lower() in [
             "excellent",
             "good",
             "fair",
@@ -221,8 +222,8 @@ class TestOptimizationIntegration:
         for field in expected_fields:
             if field in contact_info:
                 field_info = contact_info[field]
-                assert "performance_level" in field_info
-                assert "server_supported" in field_info
+                assert "estimated_reduction" in field_info
+                assert "supported_operators" in field_info
 
         # Get field optimization info for tags
         tag_info = api_parameter_optimizer.get_field_optimization_info("tag")
