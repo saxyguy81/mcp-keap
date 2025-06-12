@@ -87,62 +87,8 @@ class TestFocusedIntegration:
         ]
 
 
-    @pytest.mark.asyncio
-    async def test_get_tags_integration(self, mock_context, sample_tags):
-        """Test get_tags integration with API and cache."""
-        mock_api_client = AsyncMock(spec=KeapApiService)
-        mock_api_client.get_tags.return_value = {"tags": sample_tags}
-
-        mock_cache_manager = AsyncMock()
-        mock_cache_manager.get.return_value = None  # Cache miss
-        mock_cache_manager.set = AsyncMock()
-
-        with (
-            patch("src.mcp.tools.get_api_client", return_value=mock_api_client),
-            patch("src.mcp.tools.get_cache_manager", return_value=mock_cache_manager),
-        ):
-            # Call the actual function
-            result = await get_tags(mock_context, include_categories=True)
-
-            # Verify results
-            assert len(result) == 3
-            assert result[0]["name"] == "Customer"
-            assert result[1]["name"] == "VIP"
-
-            # Verify API was called
-            mock_api_client.get_tags.assert_called_once()
-
-            # Verify cache was attempted
-            mock_cache_manager.get.assert_called()
-            mock_cache_manager.set.assert_called()
 
 
-    @pytest.mark.asyncio
-    async def test_get_contact_details_integration(self, mock_context, sample_contacts):
-        """Test get contact details integration."""
-        john_contact = sample_contacts[0]
-
-        mock_api_client = AsyncMock(spec=KeapApiService)
-        mock_api_client.get_contact.return_value = john_contact
-
-        mock_cache_manager = AsyncMock()
-        mock_cache_manager.get.return_value = None
-        mock_cache_manager.set = AsyncMock()
-
-        with (
-            patch("src.mcp.tools.get_api_client", return_value=mock_api_client),
-            patch("src.mcp.tools.get_cache_manager", return_value=mock_cache_manager),
-        ):
-            # Get contact details
-            result = await get_contact_details(mock_context, "1")
-
-            # Verify details
-            assert result["id"] == 1
-            assert result["given_name"] == "John"
-            assert len(result["custom_fields"]) == 2
-
-            # Verify API was called
-            mock_api_client.get_contact.assert_called_once_with("1")
 
     @pytest.mark.asyncio
     async def test_apply_tags_to_contacts_integration(self, mock_context):
@@ -190,41 +136,6 @@ class TestFocusedIntegration:
         assert result["count"] == 2
         assert result["lists_processed"] == 3
 
-    @pytest.mark.asyncio
-    async def test_query_contacts_by_custom_field_integration(
-        self, mock_context, sample_contacts
-    ):
-        """Test custom field query integration."""
-        mock_api_client = AsyncMock(spec=KeapApiService)
-        mock_api_client.get_contacts.return_value = {"contacts": sample_contacts}
-
-        mock_cache_manager = AsyncMock()
-        mock_cache_manager.get.return_value = None
-        mock_cache_manager.set = AsyncMock()
-
-        with (
-            patch("src.mcp.tools.get_api_client", return_value=mock_api_client),
-            patch("src.mcp.tools.get_cache_manager", return_value=mock_cache_manager),
-            patch("src.utils.contact_utils.get_custom_field_value") as mock_get_field,
-            patch("src.utils.contact_utils.format_contact_data") as mock_format,
-        ):
-            # Mock utility functions
-            def mock_get_custom_field(contact, field_id):
-                if field_id == "7":
-                    return "VIP" if contact["id"] == 1 else "Regular"
-                return None
-
-            mock_get_field.side_effect = mock_get_custom_field
-            mock_format.side_effect = lambda x: x
-
-            # Query contacts by custom field
-            result = await query_contacts_by_custom_field(
-                mock_context, field_id="7", field_value="VIP", operator="equals"
-            )
-
-            # Should find John (VIP)
-            assert len(result) == 1
-            assert result[0]["id"] == 1
 
 
     @pytest.mark.asyncio

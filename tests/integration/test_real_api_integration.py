@@ -107,11 +107,11 @@ class TestRealApiIntegration:
         cache_stats = context.cache_manager.get_stats()
         assert cache_stats["total_entries"] > 0
 
-    @patch('src.api.client.KeapApiService.search_contacts')
+    @patch('src.api.client.KeapApiService.get_contacts')
     @pytest.mark.asyncio
-    async def test_search_contacts_integration(self, mock_search, context):
+    async def test_search_contacts_integration(self, mock_get_contacts, context):
         """Test contact search integration."""
-        mock_search.return_value = {
+        mock_get_contacts.return_value = {
             "contacts": [
                 {
                     "id": 2,
@@ -208,9 +208,13 @@ class TestRealApiIntegration:
         filters = [
             {"field": "name", "operator": "equals", "value": "test"}
         ]
-        is_valid, errors = validate_filter_conditions(filters)
-        assert is_valid is True
-        assert len(errors) == 0
+        # validate_filter_conditions raises ValueError if invalid, otherwise returns None
+        try:
+            validate_filter_conditions(filters)
+            validation_passed = True
+        except ValueError:
+            validation_passed = False
+        assert validation_passed is True
 
     def test_schema_validation_integration(self):
         """Test schema validation without mocking."""

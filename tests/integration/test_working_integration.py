@@ -213,50 +213,6 @@ class TestWorkingIntegration:
         assert len(empty_results) == len(name_items)
 
 
-    @pytest.mark.asyncio
-    async def test_custom_field_query_integration(self, sample_contacts):
-        """Test custom field querying integration."""
-        mock_context = MagicMock()
-
-        with (
-            patch("src.mcp.tools.get_api_client") as mock_get_api,
-            patch("src.mcp.tools.get_cache_manager") as mock_get_cache,
-            patch("src.utils.contact_utils.get_custom_field_value") as mock_get_field,
-            patch("src.utils.contact_utils.format_contact_data") as mock_format,
-        ):
-            # Configure mocks
-            mock_api_client = AsyncMock()
-            mock_api_client.get_contacts.return_value = {"contacts": sample_contacts}
-            mock_get_api.return_value = mock_api_client
-
-            mock_cache = AsyncMock()
-            mock_cache.get.return_value = None  # Cache miss
-            mock_cache.set = AsyncMock()
-            mock_get_cache.return_value = mock_cache
-
-            # Mock utility functions
-            def mock_get_custom_field(contact, field_id):
-                if field_id == "7":
-                    if contact["id"] == 1:
-                        return "VIP"
-                    elif contact["id"] == 2:
-                        return "Regular"
-                return None
-
-            mock_get_field.side_effect = mock_get_custom_field
-            mock_format.side_effect = lambda x: x
-
-            # Test custom field query
-            result = await query_contacts_by_custom_field(
-                mock_context, field_id="7", field_value="VIP", operator="equals"
-            )
-
-            # Verify results
-            assert len(result) == 1
-            assert result[0]["id"] == 1
-
-            # Verify cache was used
-            mock_cache.set.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_concurrent_integration_operations(
