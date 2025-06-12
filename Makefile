@@ -69,8 +69,13 @@ coverage-unit:  ## Ensure 90%+ unit test coverage (minimum requirement)
 coverage-check:  ## Check current coverage percentage
 	python -m pytest tests/unit/ --cov=src --cov-report=term | grep "^TOTAL" || echo "No coverage data"
 
-coverage-int:  ## Ensure 50%+ integration test coverage  
-	python -m pytest tests/integration/ --cov=src --cov-fail-under=50 --cov-report=term-missing --tb=no || echo "Integration tests require valid KEAP_API_KEY - checking coverage anyway"
+coverage-int:  ## Ensure 68%+ integration test coverage (local with .env)
+	@if [ -f .env ]; then \
+		python -m pytest tests/integration/ --cov=src --cov-fail-under=68 --cov-report=term-missing; \
+	else \
+		echo "⚠️  No .env file found - running without API key (coverage only)"; \
+		python -m pytest tests/integration/ --cov=src --cov-report=term-missing --tb=no || echo "Integration tests require valid KEAP_API_KEY"; \
+	fi
 	@echo "📊 Integration test coverage analysis complete"
 
 # Development workflow targets
