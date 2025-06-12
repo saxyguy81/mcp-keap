@@ -833,12 +833,7 @@ async def set_custom_field_values(
                     )
 
                     # Invalidate cache for this contact
-                    cache_key_patterns = [
-                        f"contact:{update['contact_id']}:*",
-                        f"contacts:*custom_field*{update['field_id']}*",
-                    ]
-                    for pattern in cache_key_patterns:
-                        cache_manager.invalidate_pattern(pattern)
+                    cache_manager.invalidate_contacts([update['contact_id']])
 
                 else:
                     failed_updates.append(
