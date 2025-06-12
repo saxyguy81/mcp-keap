@@ -333,7 +333,7 @@ class TestWorkingIntegration:
             mock_api_client.get_contacts.return_value = {"contacts": sample_contacts}
             mock_get_api.return_value = mock_api_client
 
-            mock_cache = MagicMock()
+            mock_cache = AsyncMock()
             mock_cache.get.return_value = None  # Cache miss
             mock_cache.set = AsyncMock()
             mock_get_cache.return_value = mock_cache

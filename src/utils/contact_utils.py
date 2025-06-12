@@ -26,12 +26,12 @@ def get_primary_email(contact: Dict[str, Any]) -> str:
 
     # Try to find the primary email first
     for email in email_addresses:
-        if email.get("field") == "EMAIL" and email.get("is_primary", False):
+        if email.get("field", "").startswith("EMAIL") and email.get("is_primary", False):
             return email.get("email", "")
 
     # Fall back to the first email address
     for email in email_addresses:
-        if email.get("field") == "EMAIL":
+        if email.get("field", "").startswith("EMAIL"):
             return email.get("email", "")
 
     return ""

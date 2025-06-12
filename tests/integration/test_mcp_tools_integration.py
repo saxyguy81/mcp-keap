@@ -115,7 +115,8 @@ class TestMCPToolsIntegration:
     @pytest.fixture
     async def context_with_mocks(self, mock_api_client, mock_cache_manager):
         """Create a context with mocked dependencies."""
-        context = Context()
+        from unittest.mock import MagicMock
+        context = MagicMock()
         context.api_client = mock_api_client
         context.cache_manager = mock_cache_manager
         return context
@@ -291,7 +292,8 @@ class TestMCPToolsIntegration:
         mock_api_client = AsyncMock()
         mock_api_client.update_contact_custom_field.side_effect = Exception("API Error")
 
-        context = Context()
+        from unittest.mock import MagicMock
+        context = MagicMock()
         context.api_client = mock_api_client
         context.cache_manager = mock_cache_manager
 
@@ -351,7 +353,8 @@ class TestMCPToolsPerformance:
 
         mock_cache_manager = AsyncMock()
 
-        context = Context()
+        from unittest.mock import MagicMock
+        context = MagicMock()
         context.api_client = mock_api_client
         context.cache_manager = mock_cache_manager
 
@@ -376,7 +379,8 @@ class TestMCPToolsPerformance:
 
         mock_cache_manager = AsyncMock()
 
-        context = Context()
+        from unittest.mock import MagicMock
+        context = MagicMock()
         context.api_client = mock_api_client
         context.cache_manager = mock_cache_manager
 
@@ -417,7 +421,8 @@ class TestMCPToolsResilience:
 
         mock_cache_manager = AsyncMock()
 
-        context = Context()
+        from unittest.mock import MagicMock
+        context = MagicMock()
         context.api_client = mock_api_client
         context.cache_manager = mock_cache_manager
 
@@ -440,7 +445,8 @@ class TestMCPToolsResilience:
         mock_cache_manager = AsyncMock()
         mock_cache_manager.invalidate_pattern.side_effect = Exception("Cache failure")
 
-        context = Context()
+        from unittest.mock import MagicMock
+        context = MagicMock()
         context.api_client = mock_api_client
         context.cache_manager = mock_cache_manager
 
@@ -461,7 +467,8 @@ class TestMCPToolsResilience:
         mock_cache_manager = AsyncMock()
         mock_cache_manager.get_diagnostics.return_value = {}  # Empty cache diagnostics
 
-        context = Context()
+        from unittest.mock import MagicMock
+        context = MagicMock()
         context.api_client = mock_api_client
         context.cache_manager = mock_cache_manager
 

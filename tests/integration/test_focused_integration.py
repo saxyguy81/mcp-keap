@@ -201,7 +201,7 @@ class TestFocusedIntegration:
     async def test_apply_tags_to_contacts_integration(self, mock_context):
         """Test applying tags to contacts integration."""
         mock_api_client = AsyncMock(spec=KeapApiService)
-        mock_api_client.apply_tag_to_contacts.return_value = {"success": True}
+        mock_api_client.apply_tags_to_contacts.return_value = {"success": True}
 
         mock_cache_manager = AsyncMock()
         mock_cache_manager.invalidate_pattern = AsyncMock()
@@ -217,10 +217,10 @@ class TestFocusedIntegration:
 
             # Verify result
             assert result["success"] is True
-            assert "applied_count" in result
+            assert "operations_completed" in result
 
             # Verify API calls
-            assert mock_api_client.apply_tag_to_contacts.call_count >= 1
+            assert mock_api_client.apply_tags_to_contacts.call_count >= 1
 
             # Verify cache invalidation
             mock_cache_manager.invalidate_pattern.assert_called()
@@ -295,14 +295,14 @@ class TestFocusedIntegration:
             # Set custom field values
             result = await set_custom_field_values(
                 mock_context,
-                contact_ids=["1", "2"],
                 field_id="7",
-                field_value="Premium",
+                contact_ids=["1", "2"],
+                common_value="Premium",
             )
 
             # Verify result
             assert result["success"] is True
-            assert "updated_count" in result
+            assert "successful_updates" in result
 
             # Verify API calls
             assert mock_api_client.update_contact_custom_field.call_count >= 1
@@ -318,9 +318,14 @@ class TestFocusedIntegration:
             "total_requests": 100,
             "successful_requests": 95,
             "failed_requests": 5,
+            "retried_requests": 10,
+            "rate_limited_requests": 2,
             "average_response_time": 1.2,
             "cache_hits": 50,
             "cache_misses": 50,
+            "endpoints_called": {"/contacts": 80, "/tags": 20},
+            "error_counts": {"HTTP_500": 3, "HTTP_429": 2},
+            "requests_per_hour": 100,
         }
 
         with patch("src.mcp.tools.get_api_client", return_value=mock_api_client):
@@ -368,14 +373,14 @@ class TestFocusedIntegration:
             result = await query_contacts_optimized(
                 mock_context,
                 filters=filters,
-                enable_optimization=False,  # Use basic path
+                enable_optimization=True,  # Use optimization path
                 return_metrics=True,
             )
 
             # Verify result structure
             assert "contacts" in result
             assert "count" in result
-            assert "metrics" in result
+            assert "performance_metrics" in result
 
             # Verify data
             assert result["count"] >= 0
@@ -430,7 +435,7 @@ class TestFocusedIntegration:
             # Verify analysis data
             query_analysis = result["query_analysis"]
             assert query_analysis["optimization_score"] == 0.9
-            assert query_analysis["strategy"] == "highly_optimized"
+            assert query_analysis["optimization_strategy"] == "highly_optimized"
 
     @pytest.mark.asyncio
     async def test_tool_registry_integration(self):
@@ -466,7 +471,7 @@ class TestFocusedIntegration:
         mock_api_client = AsyncMock(spec=KeapApiService)
         mock_api_client.get_contacts.return_value = {"contacts": sample_contacts}
         mock_api_client.get_tags.return_value = {"tags": sample_tags}
-        mock_api_client.apply_tag_to_contacts.return_value = {"success": True}
+        mock_api_client.apply_tags_to_contacts.return_value = {"success": True}
 
         mock_cache_manager = AsyncMock()
         mock_cache_manager.get.return_value = None
