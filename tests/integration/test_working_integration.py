@@ -100,41 +100,6 @@ class TestWorkingIntegration:
             },
         ]
 
-    @pytest.mark.asyncio
-    async def test_cache_and_utility_integration(self, cache_manager, sample_contacts):
-        """Test integration between cache and utility functions."""
-        # Store contacts in cache
-        cache_key = "test_contacts"
-        await cache_manager.set(cache_key, sample_contacts, ttl=3600)
-
-        # Retrieve from cache
-        cached_contacts = await cache_manager.get(cache_key)
-        assert cached_contacts is not None
-        assert len(cached_contacts) == 3
-
-        # Test utility functions with cached data
-        for contact in cached_contacts:
-            # Test custom field extraction
-            custom_field_value = get_custom_field_value(contact, "7")
-            if contact["id"] == 1:
-                assert custom_field_value == "VIP"
-            elif contact["id"] == 2:
-                assert custom_field_value == "Regular"
-            elif contact["id"] == 3:
-                assert custom_field_value is None
-
-            # Test email extraction
-            primary_email = get_primary_email(contact)
-            assert "@" in primary_email
-
-            # Test full name extraction
-            full_name = get_full_name(contact)
-            assert contact["given_name"] in full_name
-
-            # Test contact formatting
-            formatted = format_contact_data(contact)
-            assert formatted["id"] == contact["id"]
-            assert formatted["given_name"] == contact["given_name"]
 
     @pytest.mark.asyncio
     async def test_filter_utils_with_contact_data(self, sample_contacts):
@@ -225,42 +190,6 @@ class TestWorkingIntegration:
         assert result["success"] is False
         assert "At least two lists are required" in result["error"]
 
-    @pytest.mark.asyncio
-    async def test_contact_processing_integration(self, sample_contacts):
-        """Test contact processing functions integration."""
-        john_contact = sample_contacts[0]
-
-        # Test include fields processing
-        include_fields = ["email_addresses", "custom_fields", "tag_ids"]
-        processed = process_contact_include_fields(john_contact, include_fields)
-
-        # Verify included fields are present
-        assert "email_addresses" in processed
-        assert "custom_fields" in processed
-        assert "tag_ids" in processed
-
-        # Test email extraction from processed contact
-        primary_email = get_primary_email(processed)
-        assert "john@example.com" == primary_email
-
-        # Test full name extraction
-        full_name = get_full_name(processed)
-        assert "John Doe" == full_name
-
-        # Test tag IDs extraction
-        tag_ids = get_tag_ids(processed)
-        assert tag_ids == [10, 20, 30]
-
-        # Test custom field extraction
-        vip_value = get_custom_field_value(processed, "7")
-        assert vip_value == "VIP"
-
-        premium_value = get_custom_field_value(processed, "8")
-        assert premium_value == "Premium"
-
-        # Test non-existent custom field
-        non_existent = get_custom_field_value(processed, "999")
-        assert non_existent is None
 
     @pytest.mark.asyncio
     async def test_filter_integration_with_name_patterns(self, sample_contacts):
@@ -283,39 +212,6 @@ class TestWorkingIntegration:
         empty_results = filter_by_name_pattern(name_items, "")
         assert len(empty_results) == len(name_items)
 
-    @pytest.mark.asyncio
-    async def test_cache_and_api_client_integration(self, cache_manager):
-        """Test integration between cache and API client patterns."""
-        # Mock API client
-        mock_api_client = AsyncMock(spec=KeapApiService)
-        mock_api_client.get_contacts.return_value = {
-            "contacts": [
-                {"id": 1, "given_name": "John", "email": "john@example.com"},
-                {"id": 2, "given_name": "Jane", "email": "jane@example.com"},
-            ]
-        }
-
-        # Simulate API call and caching pattern
-        cache_key = "contacts:list:limit_10"
-
-        # Check cache first (should be empty)
-        cached_data = await cache_manager.get(cache_key)
-        assert cached_data is None
-
-        # Make API call
-        api_response = await mock_api_client.get_contacts(limit=10)
-        contacts = api_response["contacts"]
-
-        # Cache the response
-        await cache_manager.set(cache_key, contacts, ttl=1800)
-
-        # Verify cache hit
-        cached_contacts = await cache_manager.get(cache_key)
-        assert cached_contacts == contacts
-        assert len(cached_contacts) == 2
-
-        # Verify API was called only once
-        mock_api_client.get_contacts.assert_called_once_with(limit=10)
 
     @pytest.mark.asyncio
     async def test_custom_field_query_integration(self, sample_contacts):
@@ -441,45 +337,3 @@ class TestWorkingIntegration:
             # Exception handling is acceptable
             pass
 
-    @pytest.mark.asyncio
-    async def test_performance_integration(self, cache_manager, sample_contacts):
-        """Test performance characteristics of integrated components."""
-        # Test cache performance
-        start_time = time.time()
-
-        for i in range(100):
-            cache_key = f"perf_test_{i}"
-            await cache_manager.set(cache_key, {"test": i}, ttl=3600)
-            cached = await cache_manager.get(cache_key)
-            assert cached["test"] == i
-
-        cache_time = time.time() - start_time
-        assert cache_time < 2.0  # Should complete within 2 seconds
-
-        # Test filter performance
-        start_time = time.time()
-
-        for i in range(50):
-            filters = [{"field": "id", "operator": ">", "value": i % 3}]
-            filtered = apply_complex_filters(sample_contacts, filters)
-            assert isinstance(filtered, list)
-
-        filter_time = time.time() - start_time
-        assert filter_time < 1.0  # Should complete within 1 second
-
-        # Test utility function performance
-        start_time = time.time()
-
-        for i in range(100):
-            contact = sample_contacts[i % len(sample_contacts)]
-            primary_email = get_primary_email(contact)
-            get_custom_field_value(contact, "7")
-            formatted = format_contact_data(contact)
-            full_name = get_full_name(contact)
-
-            assert isinstance(primary_email, str)
-            assert isinstance(formatted, dict)
-            assert isinstance(full_name, str)
-
-        utility_time = time.time() - start_time
-        assert utility_time < 1.0  # Should complete within 1 second

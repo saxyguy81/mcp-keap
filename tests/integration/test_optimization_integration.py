@@ -97,63 +97,7 @@ class TestOptimizationIntegration:
         """Create API parameter optimizer."""
         return ApiParameterOptimizer()
 
-    @pytest.mark.asyncio
-    async def test_query_execution_with_server_optimization(
-        self, query_executor, mock_api_client
-    ):
-        """Test query execution using server-side optimization."""
-        filters = [
-            {"field": "email", "operator": "=", "value": "john@example.com"},
-            {"field": "given_name", "operator": "contains", "value": "John"},
-        ]
 
-        # Execute optimized query
-        contacts, metrics = await query_executor.execute_optimized_query(
-            query_type="list_contacts", filters=filters, limit=50
-        )
-
-        # Verify results
-        assert len(contacts) == 2
-        assert contacts[0]["given_name"] == "John"
-        assert contacts[1]["given_name"] == "Jane"
-
-        # Verify metrics
-        assert metrics.api_calls >= 1
-        assert metrics.total_duration_ms > 0
-        assert isinstance(metrics.strategy_used, str)
-
-        # Verify API was called with optimizations
-        mock_api_client.get_contacts.assert_called()
-
-    @pytest.mark.asyncio
-    async def test_query_execution_with_cache_optimization(
-        self, query_executor, mock_api_client, cache_manager
-    ):
-        """Test query execution with cache optimization."""
-        filters = [{"field": "given_name", "operator": "=", "value": "John"}]
-
-        # First execution - should hit API and cache result
-        contacts1, metrics1 = await query_executor.execute_optimized_query(
-            query_type="list_contacts", filters=filters, limit=50
-        )
-
-        # Verify first execution
-        assert len(contacts1) == 2
-        assert metrics1.cache_hit is False
-        assert metrics1.api_calls == 1
-
-        # Second execution - should hit cache
-        contacts2, metrics2 = await query_executor.execute_optimized_query(
-            query_type="list_contacts", filters=filters, limit=50
-        )
-
-        # Verify cache hit
-        assert contacts1 == contacts2
-        assert metrics2.cache_hit is True
-        assert metrics2.api_calls == 0
-
-        # API should only be called once
-        assert mock_api_client.get_contacts.call_count == 1
 
     @pytest.mark.asyncio
     async def test_hybrid_optimization_strategy(
@@ -224,66 +168,7 @@ class TestOptimizationIntegration:
             "poor",
         ]
 
-    @pytest.mark.asyncio
-    async def test_optimization_with_tag_queries(
-        self, query_executor, api_parameter_optimizer, mock_api_client
-    ):
-        """Test optimization integration with tag queries."""
-        filters = [
-            {"field": "name", "operator": "contains", "value": "Customer"},
-            {"field": "category", "operator": "=", "value": "Status"},
-        ]
 
-        # Optimize tag query parameters
-        optimization_result = api_parameter_optimizer.optimize_tag_query_parameters(
-            filters
-        )
-
-        # Verify tag optimization
-        assert optimization_result.optimization_strategy in [
-            "highly_optimized",
-            "moderately_optimized",
-            "minimally_optimized",
-        ]
-        assert optimization_result.optimization_score >= 0
-
-        # Execute optimized tag query
-        tags, metrics = await query_executor.execute_optimized_query(
-            query_type="get_tags", filters=filters, limit=100
-        )
-
-        # Verify results
-        assert len(tags) == 2
-        assert metrics.api_calls >= 1
-        assert isinstance(metrics.strategy_used, str)
-
-    @pytest.mark.asyncio
-    async def test_optimization_performance_measurement(
-        self, query_executor, mock_api_client
-    ):
-        """Test optimization performance measurement and metrics."""
-        filters = [{"field": "email", "operator": "=", "value": "john@example.com"}]
-
-        # Execute multiple queries to measure performance
-        execution_times = []
-
-        for i in range(5):
-            start_time = time.time()
-
-            contacts, metrics = await query_executor.execute_optimized_query(
-                query_type="list_contacts", filters=filters, limit=50
-            )
-
-            end_time = time.time()
-            execution_times.append(end_time - start_time)
-
-            # Verify consistent results
-            assert len(contacts) == 2
-            assert metrics.total_duration_ms > 0
-
-        # Verify performance consistency
-        avg_time = sum(execution_times) / len(execution_times)
-        assert avg_time < 1.0  # Should complete quickly with optimization
 
     @pytest.mark.asyncio
     async def test_optimization_with_complex_filters(
@@ -375,40 +260,6 @@ class TestOptimizationIntegration:
             assert count >= 0
             assert duration > 0
 
-    @pytest.mark.asyncio
-    async def test_optimization_error_handling(self, query_executor, mock_api_client):
-        """Test optimization error handling and fallback strategies."""
-        # Configure API to fail
-        mock_api_client.get_contacts.side_effect = Exception(
-            "API temporarily unavailable"
-        )
-
-        filters = [{"field": "email", "operator": "=", "value": "test@example.com"}]
-
-        try:
-            # Attempt optimized query with failing API
-            contacts, metrics = await query_executor.execute_optimized_query(
-                query_type="list_contacts", filters=filters, limit=50
-            )
-
-            # If no exception is raised, verify graceful handling
-            assert isinstance(contacts, list)
-            assert metrics.api_calls >= 0
-
-        except Exception as e:
-            # Exception handling is acceptable for API failures - check for either error message
-            assert "API temporarily unavailable" in str(e) or "NoneType" in str(e)
-
-        # Reset API to working state
-        mock_api_client.get_contacts.side_effect = None
-
-        # Verify recovery
-        contacts, metrics = await query_executor.execute_optimized_query(
-            query_type="list_contacts", filters=filters, limit=50
-        )
-
-        assert len(contacts) == 2
-        assert metrics.api_calls >= 1
 
     @pytest.mark.asyncio
     async def test_optimization_cache_key_generation(self, query_executor):

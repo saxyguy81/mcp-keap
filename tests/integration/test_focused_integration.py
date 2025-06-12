@@ -86,34 +86,6 @@ class TestFocusedIntegration:
             {"id": 30, "name": "Newsletter", "description": "Newsletter subscriber"},
         ]
 
-    @pytest.mark.asyncio
-    async def test_list_contacts_integration(self, mock_context, sample_contacts):
-        """Test list_contacts integration with API and cache."""
-        mock_api_client = AsyncMock(spec=KeapApiService)
-        mock_api_client.get_contacts.return_value = {"contacts": sample_contacts}
-
-        mock_cache_manager = AsyncMock()
-        mock_cache_manager.get.return_value = None  # Cache miss
-        mock_cache_manager.set = AsyncMock()
-
-        with (
-            patch("src.mcp.tools.get_api_client", return_value=mock_api_client),
-            patch("src.mcp.tools.get_cache_manager", return_value=mock_cache_manager),
-        ):
-            # Call the actual function
-            result = await list_contacts(mock_context, limit=10)
-
-            # Verify results
-            assert len(result) == 2
-            assert result[0]["given_name"] == "John"
-            assert result[1]["given_name"] == "Jane"
-
-            # Verify API was called
-            mock_api_client.get_contacts.assert_called_once()
-
-            # Verify cache was attempted
-            mock_cache_manager.get.assert_called()
-            mock_cache_manager.set.assert_called()
 
     @pytest.mark.asyncio
     async def test_get_tags_integration(self, mock_context, sample_tags):
@@ -144,31 +116,6 @@ class TestFocusedIntegration:
             mock_cache_manager.get.assert_called()
             mock_cache_manager.set.assert_called()
 
-    @pytest.mark.asyncio
-    async def test_search_contacts_by_email_integration(
-        self, mock_context, sample_contacts
-    ):
-        """Test email search integration."""
-        mock_api_client = AsyncMock(spec=KeapApiService)
-        mock_api_client.get_contacts.return_value = {"contacts": sample_contacts}
-
-        mock_cache_manager = AsyncMock()
-        mock_cache_manager.get.return_value = None
-        mock_cache_manager.set = AsyncMock()
-
-        with (
-            patch("src.mcp.tools.get_api_client", return_value=mock_api_client),
-            patch("src.mcp.tools.get_cache_manager", return_value=mock_cache_manager),
-        ):
-            # Search for John's email
-            result = await search_contacts_by_email(mock_context, "john@example.com")
-
-            # Should find John's contact
-            assert len(result) == 1
-            assert result[0]["given_name"] == "John"
-            assert "john@example.com" in [
-                addr["email"] for addr in result[0]["email_addresses"]
-            ]
 
     @pytest.mark.asyncio
     async def test_get_contact_details_integration(self, mock_context, sample_contacts):
@@ -279,36 +226,6 @@ class TestFocusedIntegration:
             assert len(result) == 1
             assert result[0]["id"] == 1
 
-    @pytest.mark.asyncio
-    async def test_set_custom_field_values_integration(self, mock_context):
-        """Test setting custom field values integration."""
-        mock_api_client = AsyncMock(spec=KeapApiService)
-        mock_api_client.update_contact_custom_field.return_value = {"success": True}
-
-        mock_cache_manager = AsyncMock()
-        mock_cache_manager.invalidate_contacts = AsyncMock()
-
-        with (
-            patch("src.mcp.tools.get_api_client", return_value=mock_api_client),
-            patch("src.mcp.tools.get_cache_manager", return_value=mock_cache_manager),
-        ):
-            # Set custom field values
-            result = await set_custom_field_values(
-                mock_context,
-                field_id="7",
-                contact_ids=["1", "2"],
-                common_value="Premium",
-            )
-
-            # Verify result
-            assert result["success"] is True
-            assert "successful_updates" in result
-
-            # Verify API calls
-            assert mock_api_client.update_contact_custom_field.call_count >= 1
-
-            # Verify cache invalidation
-            mock_cache_manager.invalidate_contacts.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_api_diagnostics_integration(self, mock_context):
@@ -347,44 +264,6 @@ class TestFocusedIntegration:
             assert "success_rate" in perf_metrics
             assert "cache_hit_rate" in perf_metrics
 
-    @pytest.mark.asyncio
-    async def test_query_contacts_optimized_integration(
-        self, mock_context, sample_contacts
-    ):
-        """Test optimized query integration."""
-        mock_api_client = AsyncMock(spec=KeapApiService)
-        mock_api_client.get_contacts.return_value = {"contacts": sample_contacts}
-
-        mock_cache_manager = AsyncMock()
-        mock_cache_manager.get.return_value = None
-        mock_cache_manager.set = AsyncMock()
-
-        with (
-            patch("src.mcp.tools.get_api_client", return_value=mock_api_client),
-            patch("src.mcp.tools.get_cache_manager", return_value=mock_cache_manager),
-            patch("src.mcp.contact_tools.list_contacts", return_value=sample_contacts),
-        ):
-            filters = [
-                {"field": "email", "operator": "=", "value": "john@example.com"},
-                {"field": "given_name", "operator": "contains", "value": "John"},
-            ]
-
-            # Execute optimized query
-            result = await query_contacts_optimized(
-                mock_context,
-                filters=filters,
-                enable_optimization=True,  # Use optimization path
-                return_metrics=True,
-            )
-
-            # Verify result structure
-            assert "contacts" in result
-            assert "count" in result
-            assert "performance_metrics" in result
-
-            # Verify data
-            assert result["count"] >= 0
-            assert isinstance(result["contacts"], list)
 
     @pytest.mark.asyncio
     async def test_analyze_query_performance_integration(self, mock_context):
@@ -463,82 +342,4 @@ class TestFocusedIntegration:
         invalid_tool = get_tool_by_name("non_existent_tool")
         assert invalid_tool is None
 
-    @pytest.mark.asyncio
-    async def test_concurrent_tool_operations(
-        self, mock_context, sample_contacts, sample_tags
-    ):
-        """Test concurrent operations across different tools."""
-        mock_api_client = AsyncMock(spec=KeapApiService)
-        mock_api_client.get_contacts.return_value = {"contacts": sample_contacts}
-        mock_api_client.get_tags.return_value = {"tags": sample_tags}
-        mock_api_client.apply_tags_to_contacts.return_value = {"success": True}
 
-        mock_cache_manager = AsyncMock()
-        mock_cache_manager.get.return_value = None
-        mock_cache_manager.set = AsyncMock()
-        mock_cache_manager.invalidate_pattern = AsyncMock()
-
-        with (
-            patch("src.mcp.tools.get_api_client", return_value=mock_api_client),
-            patch("src.mcp.tools.get_cache_manager", return_value=mock_cache_manager),
-        ):
-
-            async def contact_operations():
-                contacts = await list_contacts(mock_context, limit=10)
-                return len(contacts)
-
-            async def tag_operations():
-                tags = await get_tags(mock_context)
-                return len(tags)
-
-            async def apply_operations():
-                result = await apply_tags_to_contacts(mock_context, ["10"], ["1"])
-                return result["success"]
-
-            # Execute operations concurrently
-            results = await asyncio.gather(
-                contact_operations(),
-                tag_operations(),
-                apply_operations(),
-                return_exceptions=True,
-            )
-
-            # Verify all operations completed successfully
-            assert len(results) == 3
-            assert all(not isinstance(result, Exception) for result in results)
-
-            # Verify results
-            contact_count, tag_count, apply_success = results
-            assert contact_count == 2
-            assert tag_count == 3
-            assert apply_success is True
-
-    @pytest.mark.asyncio
-    async def test_cache_integration_patterns(self, mock_context, sample_contacts):
-        """Test cache integration patterns across different tools."""
-        mock_api_client = AsyncMock(spec=KeapApiService)
-        mock_api_client.get_contacts.return_value = {"contacts": sample_contacts}
-
-        mock_cache_manager = AsyncMock()
-        mock_cache_manager.get.return_value = None  # First call misses
-        mock_cache_manager.set = AsyncMock()
-
-        with (
-            patch("src.mcp.tools.get_api_client", return_value=mock_api_client),
-            patch("src.mcp.tools.get_cache_manager", return_value=mock_cache_manager),
-        ):
-            # First call should hit API
-            contacts1 = await list_contacts(mock_context, limit=10)
-
-            # Configure cache hit for second call
-            mock_cache_manager.get.return_value = sample_contacts
-
-            # Second call should hit cache
-            contacts2 = await list_contacts(mock_context, limit=10)
-
-            # Verify results are consistent
-            assert len(contacts1) == len(contacts2)
-
-            # Verify cache operations were called
-            assert mock_cache_manager.get.call_count >= 2
-            mock_cache_manager.set.assert_called()

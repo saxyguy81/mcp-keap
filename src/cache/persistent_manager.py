@@ -277,6 +277,17 @@ class PersistentCacheManager:
                 for contact in value["contacts"]:
                     if isinstance(contact, dict) and "id" in contact:
                         contact_ids.add(contact["id"])
+            
+            # Handle single contact object (get_contact result)
+            if "id" in value and isinstance(value.get("id"), (int, str)):
+                if "contacts" not in value:  # Only if it's not a wrapper object
+                    contact_ids.add(value["id"])
+        
+        # Handle direct list of contact objects (for cases where contacts list is cached directly)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict) and "id" in item:
+                    contact_ids.add(item["id"])
 
         # Insert contact mappings
         for contact_id in contact_ids:

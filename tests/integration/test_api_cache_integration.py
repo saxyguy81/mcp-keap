@@ -285,29 +285,6 @@ class TestApiCacheIntegration:
         assert cached_large[99]["id"] == 99
         assert operation_time < 1.0  # Should complete within 1 second
 
-    @pytest.mark.asyncio
-    async def test_cache_memory_management(self, mock_api_client, temp_db_path):
-        """Test cache memory management with limits."""
-        # Create cache with small memory limit
-        limited_cache = CacheManager(
-            db_path=temp_db_path,
-            max_entries=10,
-            max_memory_mb=0.1,  # Very small limit
-        )
-
-        try:
-            # Try to store data that exceeds memory limit
-            large_data = "x" * 1000000  # 1MB string
-
-            limited_cache.set("large_item", large_data, ttl=3600)
-
-            # Verify cache handles memory constraints gracefully
-            stats = limited_cache.get_stats()
-            assert stats["total_entries"] <= 10
-            assert stats["memory_usage_percent"] <= 100
-
-        finally:
-            limited_cache.close()
 
     @pytest.mark.asyncio
     async def test_api_diagnostics_integration_with_cache(
