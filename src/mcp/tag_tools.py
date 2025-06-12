@@ -29,7 +29,7 @@ async def get_tags(
         cache_key = f"get_tags:{hash(str(filters))}:{include_categories}:{limit}"
 
         # Check cache
-        cached_result = await cache_manager.get(cache_key)
+        cached_result = cache_manager.get(cache_key)
         if cached_result:
             logger.debug(f"Cache hit for get_tags: {cache_key}")
             return cached_result
@@ -84,7 +84,7 @@ async def get_tags(
             formatted_tags.append(formatted_tag)
 
         # Cache result
-        await cache_manager.set(cache_key, formatted_tags, ttl=3600)  # 1 hour
+        cache_manager.set(cache_key, formatted_tags, ttl=3600)  # 1 hour
 
         logger.info(f"Retrieved {len(formatted_tags)} tags")
         return formatted_tags
@@ -105,7 +105,7 @@ async def get_contacts_with_tag(
         cache_key = f"contacts_with_tag:{tag_id}:{limit}:{hash(str(include))}"
 
         # Check cache
-        cached_result = await cache_manager.get(cache_key)
+        cached_result = cache_manager.get(cache_key)
         if cached_result:
             return cached_result
 
@@ -122,7 +122,7 @@ async def get_contacts_with_tag(
         formatted_contacts = [format_contact_data(contact) for contact in contacts]
 
         # Cache result
-        await cache_manager.set(cache_key, formatted_contacts, ttl=1800)  # 30 minutes
+        cache_manager.set(cache_key, formatted_contacts, ttl=1800)  # 30 minutes
 
         logger.info(f"Found {len(formatted_contacts)} contacts with tag {tag_id}")
         return formatted_contacts
@@ -141,7 +141,7 @@ async def get_tag_details(context, tag_id: str) -> Dict[str, Any]:
         cache_key = f"tag_details:{tag_id}"
 
         # Check cache
-        cached_result = await cache_manager.get(cache_key)
+        cached_result = cache_manager.get(cache_key)
         if cached_result:
             return cached_result
 
@@ -159,7 +159,7 @@ async def get_tag_details(context, tag_id: str) -> Dict[str, Any]:
             formatted_tag["category"] = tag["category"]
 
         # Cache result
-        await cache_manager.set(cache_key, formatted_tag, ttl=3600)  # 1 hour
+        cache_manager.set(cache_key, formatted_tag, ttl=3600)  # 1 hour
 
         logger.info(f"Retrieved details for tag: {tag_id}")
         return formatted_tag

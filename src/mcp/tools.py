@@ -303,7 +303,7 @@ async def query_contacts_by_custom_field(
         cache_key = f"custom_field_query:{field_id}:{field_value}:{operator}:{limit}"
 
         # Check cache
-        cached_result = await cache_manager.get(cache_key)
+        cached_result = cache_manager.get(cache_key)
         if cached_result:
             return cached_result
 
@@ -346,7 +346,7 @@ async def query_contacts_by_custom_field(
         ]
 
         # Cache result
-        await cache_manager.set(cache_key, formatted_contacts, ttl=1800)
+        cache_manager.set(cache_key, formatted_contacts, ttl=1800)
 
         logger.info(
             f"Found {len(formatted_contacts)} contacts with custom field {field_id}={field_value}"
@@ -838,7 +838,7 @@ async def set_custom_field_values(
                         f"contacts:*custom_field*{update['field_id']}*",
                     ]
                     for pattern in cache_key_patterns:
-                        await cache_manager.invalidate_pattern(pattern)
+                        cache_manager.invalidate_pattern(pattern)
 
                 else:
                     failed_updates.append(

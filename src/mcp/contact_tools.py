@@ -38,7 +38,7 @@ async def list_contacts(
         cache_key = f"list_contacts:{hash(str(filters))}{limit}:{offset}:{order_by}:{order_direction}:{hash(str(include))}"
 
         # Check cache first
-        cached_result = await cache_manager.get(cache_key)
+        cached_result = cache_manager.get(cache_key)
         if cached_result:
             logger.debug(f"Cache hit for list_contacts: {cache_key}")
             return cached_result
@@ -81,7 +81,7 @@ async def list_contacts(
         formatted_contacts = [format_contact_data(contact) for contact in contacts]
 
         # Cache result
-        await cache_manager.set(cache_key, formatted_contacts, ttl=1800)  # 30 minutes
+        cache_manager.set(cache_key, formatted_contacts, ttl=1800)  # 30 minutes
 
         logger.info(f"Retrieved {len(formatted_contacts)} contacts")
         return formatted_contacts
@@ -102,7 +102,7 @@ async def search_contacts_by_email(
         cache_key = f"search_email:{email}:{hash(str(include))}"
 
         # Check cache
-        cached_result = await cache_manager.get(cache_key)
+        cached_result = cache_manager.get(cache_key)
         if cached_result:
             return cached_result
 
@@ -121,7 +121,7 @@ async def search_contacts_by_email(
         formatted_contacts = [format_contact_data(contact) for contact in contacts]
 
         # Cache result
-        await cache_manager.set(cache_key, formatted_contacts, ttl=1800)
+        cache_manager.set(cache_key, formatted_contacts, ttl=1800)
 
         logger.info(f"Found {len(formatted_contacts)} contacts for email: {email}")
         return formatted_contacts
@@ -142,7 +142,7 @@ async def search_contacts_by_name(
         cache_key = f"search_name:{name}:{hash(str(include))}"
 
         # Check cache
-        cached_result = await cache_manager.get(cache_key)
+        cached_result = cache_manager.get(cache_key)
         if cached_result:
             return cached_result
 
@@ -181,7 +181,7 @@ async def search_contacts_by_name(
         ]
 
         # Cache result
-        await cache_manager.set(cache_key, formatted_contacts, ttl=1800)
+        cache_manager.set(cache_key, formatted_contacts, ttl=1800)
 
         logger.info(f"Found {len(formatted_contacts)} contacts for name: {name}")
         return formatted_contacts
@@ -202,7 +202,7 @@ async def get_contact_details(
         cache_key = f"contact_details:{contact_id}:{hash(str(include))}"
 
         # Check cache
-        cached_result = await cache_manager.get(cache_key)
+        cached_result = cache_manager.get(cache_key)
         if cached_result:
             return cached_result
 
@@ -217,7 +217,7 @@ async def get_contact_details(
         formatted_contact = format_contact_data(contact)
 
         # Cache result
-        await cache_manager.set(cache_key, formatted_contact, ttl=3600)  # 1 hour
+        cache_manager.set(cache_key, formatted_contact, ttl=3600)  # 1 hour
 
         logger.info(f"Retrieved details for contact: {contact_id}")
         return formatted_contact
