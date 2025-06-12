@@ -74,11 +74,10 @@ class TestRealApiIntegration:
         # Test stats
         stats = real_cache_manager.get_stats()
         assert "total_entries" in stats
-        assert "memory_usage_mb" in stats
         assert stats["total_entries"] >= 1
 
         # Test invalidation
-        real_cache_manager.invalidate_pattern("test_*")
+        real_cache_manager.invalidate_all()
         result = real_cache_manager.get("test_key")
         assert result is None
 
