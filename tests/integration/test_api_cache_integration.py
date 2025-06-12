@@ -95,7 +95,7 @@ class TestApiCacheIntegration:
         cache_key = "contacts:all:limit=10"
 
         # Initially cache should be empty
-        cached_data = await cache_manager.get(cache_key)
+        cached_data = cache_manager.get(cache_key)
         assert cached_data is None
 
         # Simulate API call and cache storage
@@ -103,10 +103,10 @@ class TestApiCacheIntegration:
         contacts = api_response["contacts"]
 
         # Store in cache with TTL
-        await cache_manager.set(cache_key, contacts, ttl=1800)
+        cache_manager.set(cache_key, contacts, ttl=1800)
 
         # Verify cache hit
-        cached_contacts = await cache_manager.get(cache_key)
+        cached_contacts = cache_manager.get(cache_key)
         assert cached_contacts is not None
         assert len(cached_contacts) == 2
         assert cached_contacts[0]["id"] == 1
@@ -124,17 +124,17 @@ class TestApiCacheIntegration:
 
         # Store data with very short TTL
         initial_data = [{"id": 999, "name": "Temporary"}]
-        await cache_manager.set(cache_key, initial_data, ttl=0.1)
+        cache_manager.set(cache_key, initial_data, ttl=0.1)
 
         # Verify initial cache hit
-        cached_data = await cache_manager.get(cache_key)
+        cached_data = cache_manager.get(cache_key)
         assert cached_data == initial_data
 
         # Wait for expiration
         await asyncio.sleep(0.2)
 
         # Cache should now be empty
-        expired_data = await cache_manager.get(cache_key)
+        expired_data = cache_manager.get(cache_key)
         assert expired_data is None
 
         # Simulate API call for fresh data
@@ -142,10 +142,10 @@ class TestApiCacheIntegration:
         fresh_contacts = fresh_response["contacts"]
 
         # Store fresh data
-        await cache_manager.set(cache_key, fresh_contacts, ttl=1800)
+        cache_manager.set(cache_key, fresh_contacts, ttl=1800)
 
         # Verify fresh data is cached
-        cached_fresh = await cache_manager.get(cache_key)
+        cached_fresh = cache_manager.get(cache_key)
         assert cached_fresh == fresh_contacts
         assert len(cached_fresh) == 2
 
@@ -160,14 +160,14 @@ class TestApiCacheIntegration:
 
         # Get and cache initial contact
         contact_response = await mock_api_client.get_contact(1)
-        await cache_manager.set(contact_cache_key, contact_response)
+        cache_manager.set(contact_cache_key, contact_response)
 
         contacts_response = await mock_api_client.get_contacts()
-        await cache_manager.set(contacts_cache_key, contacts_response["contacts"])
+        cache_manager.set(contacts_cache_key, contacts_response["contacts"])
 
         # Verify cached data
-        cached_contact = await cache_manager.get(contact_cache_key)
-        cached_contacts = await cache_manager.get(contacts_cache_key)
+        cached_contact = cache_manager.get(contact_cache_key)
+        cached_contacts = cache_manager.get(contacts_cache_key)
         assert cached_contact["given_name"] == "John"
         assert len(cached_contacts) == 2
 
@@ -176,11 +176,11 @@ class TestApiCacheIntegration:
         await mock_api_client.update_contact(1, {"given_name": "Johnny"})
 
         # Invalidate related cache entries
-        await cache_manager.invalidate_contacts([1])
+        cache_manager.invalidate_contacts([1])
 
         # Verify cache invalidation
-        invalidated_contact = await cache_manager.get(contact_cache_key)
-        invalidated_contacts = await cache_manager.get(contacts_cache_key)
+        invalidated_contact = cache_manager.get(contact_cache_key)
+        invalidated_contacts = cache_manager.get(contacts_cache_key)
         assert invalidated_contact is None
         assert invalidated_contacts is None
 
@@ -198,10 +198,10 @@ class TestApiCacheIntegration:
             contacts = response["contacts"]
 
             # Cache the response
-            await cache_manager.set(cache_key, contacts, ttl=3600)
+            cache_manager.set(cache_key, contacts, ttl=3600)
 
             # Verify cached data
-            cached = await cache_manager.get(cache_key)
+            cached = cache_manager.get(cache_key)
             return len(cached) if cached else 0
 
         # Run multiple concurrent operations
@@ -221,7 +221,7 @@ class TestApiCacheIntegration:
 
         # Store stale data in cache
         stale_data = [{"id": 1, "name": "Stale Contact"}]
-        await cache_manager.set(cache_key, stale_data, ttl=3600)
+        cache_manager.set(cache_key, stale_data, ttl=3600)
 
         # Configure API to fail
         mock_api_client.get_contacts.side_effect = Exception(
@@ -229,7 +229,7 @@ class TestApiCacheIntegration:
         )
 
         # Verify cache can provide fallback data
-        cached_data = await cache_manager.get(cache_key)
+        cached_data = cache_manager.get(cache_key)
         assert cached_data == stale_data
 
         # Simulate recovery scenario
@@ -238,10 +238,10 @@ class TestApiCacheIntegration:
         fresh_contacts = fresh_response["contacts"]
 
         # Update cache with fresh data
-        await cache_manager.set(cache_key, fresh_contacts, ttl=3600)
+        cache_manager.set(cache_key, fresh_contacts, ttl=3600)
 
         # Verify fresh data is now cached
-        updated_cached = await cache_manager.get(cache_key)
+        updated_cached = cache_manager.get(cache_key)
         assert updated_cached == fresh_contacts
 
     @pytest.mark.asyncio
@@ -271,10 +271,10 @@ class TestApiCacheIntegration:
         # Store large dataset
         cache_key = "contacts:large_dataset"
         response = await mock_api_client.get_contacts(limit=100)
-        await cache_manager.set(cache_key, response["contacts"], ttl=3600)
+        cache_manager.set(cache_key, response["contacts"], ttl=3600)
 
         # Retrieve from cache
-        cached_large = await cache_manager.get(cache_key)
+        cached_large = cache_manager.get(cache_key)
 
         end_time = time.time()
         operation_time = end_time - start_time
@@ -299,7 +299,7 @@ class TestApiCacheIntegration:
             # Try to store data that exceeds memory limit
             large_data = "x" * 1000000  # 1MB string
 
-            await limited_cache.set("large_item", large_data, ttl=3600)
+            limited_cache.set("large_item", large_data, ttl=3600)
 
             # Verify cache handles memory constraints gracefully
             stats = limited_cache.get_stats()
@@ -325,8 +325,8 @@ class TestApiCacheIntegration:
         }
 
         # Perform some cache operations
-        await cache_manager.set("test1", {"data": "value1"}, ttl=3600)
-        await cache_manager.set("test2", {"data": "value2"}, ttl=3600)
+        cache_manager.set("test1", {"data": "value1"}, ttl=3600)
+        cache_manager.set("test2", {"data": "value2"}, ttl=3600)
 
         # Get cache statistics
         cache_stats = cache_manager.get_stats()
