@@ -209,6 +209,11 @@ async def apply_tags_to_contacts(
             await api_client.apply_tags_to_contacts(tag_ids, contact_ids)
             success_count = len(contact_ids) * len(tag_ids)
 
+            # Invalidate cache patterns for contacts and tags
+            cache_manager = context.cache_manager
+            cache_manager.invalidate_pattern("contacts:*")
+            cache_manager.invalidate_pattern("contact_tags:*")
+
             logger.info(f"Applied {len(tag_ids)} tags to {len(contact_ids)} contacts")
             return {
                 "success": True,

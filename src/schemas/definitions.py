@@ -159,7 +159,7 @@ class Contact(BaseModel):
     email: Optional[str] = Field(default=None, description="Primary email")
     phone1: Optional[str] = Field(default=None, description="Primary phone")
     phone2: Optional[str] = Field(default=None, description="Secondary phone")
-    company: Optional[str] = Field(default=None, description="Company name")
+    company: Optional[Union[str, Dict[str, Any]]] = Field(default=None, description="Company name or object")
     website: Optional[str] = Field(default=None, description="Website URL")
     address: Optional[Dict[str, Any]] = Field(
         default=None, description="Address information"

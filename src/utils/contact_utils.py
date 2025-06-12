@@ -121,7 +121,7 @@ def get_custom_field_value(contact: Dict[str, Any], field_id: Union[int, str]) -
     return None
 
 
-def format_contact_summary(contact: Dict[str, Any]) -> Dict[str, Any]:
+def format_contact_summary(contact: Dict[str, Any]) -> str:
     """Format a contact summary with key information
 
     Args:
@@ -131,17 +131,13 @@ def format_contact_summary(contact: Dict[str, Any]) -> Dict[str, Any]:
         Formatted contact summary
     """
     if not contact:
-        return {}
+        return ""
 
-    return {
-        "id": contact.get("id"),
-        "first_name": contact.get("given_name", ""),
-        "last_name": contact.get("family_name", ""),
-        "email": get_primary_email(contact),
-        "created": contact.get("create_time"),
-        "updated": contact.get("update_time"),
-        "tag_count": len(get_tag_ids(contact)),
-    }
+    full_name = get_full_name(contact)
+    email = get_primary_email(contact)
+    tag_count = len(get_tag_ids(contact))
+    
+    return f"{full_name} ({email}) - {tag_count} tags"
 
 
 def format_contact_data(contact: Dict[str, Any]) -> Dict[str, Any]:
@@ -160,6 +156,7 @@ def format_contact_data(contact: Dict[str, Any]) -> Dict[str, Any]:
         "id": contact.get("id"),
         "given_name": contact.get("given_name", ""),
         "family_name": contact.get("family_name", ""),
+        "company": contact.get("company"),
         "full_name": get_full_name(contact),
         "email": get_primary_email(contact),
         "email_addresses": contact.get("email_addresses", []),

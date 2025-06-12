@@ -232,7 +232,7 @@ class QueryExecutor:
         cache_key = self._generate_cache_key(query_type, filters, limit, offset)
 
         # Check cache first
-        cached_result = await self.cache_manager.get(cache_key)
+        cached_result = self.cache_manager.get(cache_key)
         if cached_result:
             duration_ms = (time.time() - start_time) * 1000
             metrics = QueryMetrics(
@@ -310,7 +310,7 @@ class QueryExecutor:
         )
 
         # Cache results
-        await self.cache_manager.set(cache_key, results, ttl=1800)
+        self.cache_manager.set(cache_key, results, ttl=1800)
 
         # Track performance
         self.optimizer.track_performance(cache_key, metrics)
@@ -390,8 +390,14 @@ class QueryExecutor:
             # Build server parameters from server-side filters
             from src.utils.filter_utils import optimize_filters_for_api
 
+            # Convert server_filters dict to list format for optimize_filters_for_api
+            if isinstance(server_filters, dict):
+                server_filter_list = [{"field": k, "operator": "=", "value": v} for k, v in server_filters.items()]
+            else:
+                server_filter_list = server_filters
+                
             server_params, remaining_client_filters = optimize_filters_for_api(
-                server_filters
+                server_filter_list
             )
 
             # Execute API call
