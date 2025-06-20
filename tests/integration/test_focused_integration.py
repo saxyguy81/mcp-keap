@@ -97,7 +97,8 @@ class TestFocusedIntegration:
         mock_api_client.apply_tags_to_contacts.return_value = {"success": True}
 
         mock_cache_manager = AsyncMock()
-        mock_cache_manager.invalidate_pattern = AsyncMock()
+        mock_cache_manager.invalidate_contacts = AsyncMock()
+        mock_cache_manager.invalidate_tags = AsyncMock()
 
         with (
             patch("src.mcp.tools.get_api_client", return_value=mock_api_client),
@@ -116,7 +117,8 @@ class TestFocusedIntegration:
             assert mock_api_client.apply_tags_to_contacts.call_count >= 1
 
             # Verify cache invalidation
-            mock_cache_manager.invalidate_pattern.assert_called()
+            mock_cache_manager.invalidate_contacts.assert_called()
+            mock_cache_manager.invalidate_tags.assert_called()
 
     @pytest.mark.asyncio
     async def test_intersect_id_lists_integration(self, mock_context):

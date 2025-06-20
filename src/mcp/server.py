@@ -348,15 +348,13 @@ class KeapMCPServer:
         """Run the MCP server
 
         Args:
-            host: Host to bind
-            port: Port to listen on
+            host: Host to bind (ignored for stdio mode)
+            port: Port to listen on (ignored for stdio mode)
         """
-        logger.info(f"Starting Keap MCP Server on {host}:{port}")
-        # Use SSE transport for HTTP server
+        # For Claude Desktop, run in stdio mode
         import asyncio
-
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.run_async(host, port))
+        loop.run_until_complete(self.mcp.run_stdio_async())
 
     async def run_async(self, host: str = "127.0.0.1", port: int = 5000):
         """Run the MCP server asynchronously for tests

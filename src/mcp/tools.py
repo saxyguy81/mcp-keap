@@ -22,6 +22,16 @@ def get_api_client() -> KeapApiService:
     """Get or create API client instance."""
     import os
 
+    # Debug: Write API key status to a debug file
+    try:
+        api_key = os.getenv("KEAP_API_KEY")
+        with open("/tmp/keap_debug.log", "a") as f:
+            f.write(f"API Key status: {'Found' if api_key else 'Missing'} - {api_key[:20] if api_key else 'None'}...\n")
+            f.write(f"Working directory: {os.getcwd()}\n")
+            f.write(f"Environment vars: {list(os.environ.keys())}\n")
+    except:
+        pass
+
     # For testing, provide a default API key if none exists
     if not os.getenv("KEAP_API_KEY"):
         os.environ["KEAP_API_KEY"] = "test_api_key_for_testing"

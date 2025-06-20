@@ -15,10 +15,13 @@ try:
     from dotenv import load_dotenv
 
     load_dotenv()
-    print("Loaded .env file")
 except ImportError:
-    print("Warning: python-dotenv not installed, cannot load .env file automatically")
-    print("Environment variables must be set manually.")
+    pass
+
+# Change to the script's directory to ensure relative imports work
+import os
+script_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(script_dir)
 
 from src.mcp.server import KeapMCPServer
 
@@ -30,16 +33,7 @@ def setup_logging(log_level: str = "INFO", log_file: str = None):
     # Setup handlers
     handlers = []
 
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(level)
-    console_format = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    console_handler.setFormatter(console_format)
-    handlers.append(console_handler)
-
-    # File handler if specified
+    # Only add file handler for MCP mode to avoid stdout interference
     if log_file:
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(level)
@@ -50,7 +44,11 @@ def setup_logging(log_level: str = "INFO", log_file: str = None):
         handlers.append(file_handler)
 
     # Configure root logger
-    logging.basicConfig(level=level, handlers=handlers, force=True)
+    if handlers:
+        logging.basicConfig(level=level, handlers=handlers, force=True)
+    else:
+        # Disable logging if no file handler
+        logging.basicConfig(level=logging.CRITICAL, force=True)
 
     return logging.getLogger(__name__)
 
@@ -87,12 +85,12 @@ def main():
     # Setup logging
     logger = setup_logging(log_level=args.log_level, log_file=args.log_file)
 
-    # Log configuration
-    logger.info("Starting Keap MCP Server with configuration:")
-    logger.info(f"  host: {args.host}")
-    logger.info(f"  port: {args.port}")
-    logger.info(f"  log_level: {args.log_level}")
+    # Log configuration only to file, not console for MCP
     if args.log_file:
+        logger.info("Starting Keap MCP Server with configuration:")
+        logger.info(f"  host: {args.host}")
+        logger.info(f"  port: {args.port}")
+        logger.info(f"  log_level: {args.log_level}")
         logger.info(f"  log_file: {args.log_file}")
 
     # Create and run the server
@@ -100,9 +98,12 @@ def main():
         server = KeapMCPServer()
         server.run(host=args.host, port=args.port)
     except KeyboardInterrupt:
-        logger.info("Server stopped by user")
+        if args.log_file:
+            logger.info("Server stopped by user")
+        sys.exit(0)
     except Exception as e:
-        logger.error(f"Server error: {e}", exc_info=True)
+        if args.log_file:
+            logger.error(f"Server error: {e}", exc_info=True)
         sys.exit(1)
 
 
