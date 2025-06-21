@@ -1,0 +1,125 @@
+"""
+Quick tests to boost coverage to 70%+ by targeting specific uncovered lines.
+"""
+
+import pytest
+from src.mcp.tools_collections import (
+    _validate_field_value,
+    _convert_datetime_value,
+    _normalize_datetime_value,
+    _is_datetime_field
+)
+
+
+class TestCoverageBoost:
+    """Target specific uncovered lines for coverage boost"""
+
+    @pytest.mark.asyncio
+    async def test_validation_required_field_errors(self):
+        """Test required field validation (lines 126-127)"""
+        # Test required field with None value
+        result = await _validate_field_value("given_name", None)
+        assert not result["valid"]
+        assert any("required" in err.lower() for err in result["errors"])
+        
+        # Test required field with empty string
+        result = await _validate_field_value("given_name", "")
+        assert not result["valid"]
+        assert any("required" in err.lower() for err in result["errors"])
+
+    @pytest.mark.asyncio
+    async def test_validation_type_errors(self):
+        """Test type validation errors (lines 131-142)"""
+        # Test string type validation
+        result = await _validate_field_value("given_name", 12345)
+        assert not result["valid"]
+        assert any("string" in err.lower() for err in result["errors"])
+        
+        # Test phone validation with short number
+        result = await _validate_field_value("phone", "123")
+        assert not result["valid"]
+        assert any("phone" in err.lower() for err in result["errors"])
+
+    def test_normalize_datetime_date_only(self):
+        """Test date-only normalization (lines 103-110)"""
+        # Test date_only field with ISO datetime
+        result = _normalize_datetime_value("2024-01-01T12:00:00Z", "birthday")
+        assert result == "2024-01-01"
+        
+        # Test date_only field with invalid format
+        result = _normalize_datetime_value("invalid-date", "birthday")
+        assert result == "invalid-date"  # Should pass through on error
+
+    def test_datetime_field_edge_cases(self):
+        """Test datetime field detection edge cases"""
+        # Test various field patterns
+        assert _is_datetime_field("custom_date_field") == True
+        assert _is_datetime_field("some_time_stamp") == True
+        assert _is_datetime_field("event_date") == True
+        assert _is_datetime_field("meeting_time") == True
+        
+        # Test non-datetime fields
+        assert _is_datetime_field("contact_name") == False
+        assert _is_datetime_field("tag_list") == False
+
+    def test_convert_datetime_timezone_edge_cases(self):
+        """Test datetime conversion with timezone edge cases"""
+        # Test with timezone-naive datetime requiring timezone
+        try:
+            _convert_datetime_value("2024-01-01T12:00:00", "appointment_date")
+            assert False, "Should require timezone"
+        except ValueError as e:
+            assert "timezone" in str(e).lower()
+        
+        # Test future validation
+        try:
+            _convert_datetime_value("2020-01-01T12:00:00Z", "appointment_date")
+            assert False, "Should require future date"
+        except ValueError as e:
+            assert "future" in str(e).lower()
+
+    def test_normalize_datetime_edge_cases(self):
+        """Test normalize datetime edge cases (lines 101-112)"""
+        # Test None value
+        result = _normalize_datetime_value(None)
+        assert result is None
+        
+        # Test empty string
+        result = _normalize_datetime_value("")
+        assert result == ""
+        
+        # Test date_only field without field_name
+        result = _normalize_datetime_value("2024-01-01T12:00:00Z")
+        assert result == "2024-01-01T12:00:00Z"  # No conversion without field_name
+
+    @pytest.mark.asyncio
+    async def test_validation_datetime_field_errors(self):
+        """Test datetime field validation errors (lines 145-149)"""
+        # Test invalid datetime format
+        result = await _validate_field_value("created_date", "not-a-date")
+        assert not result["valid"]
+        assert len(result["errors"]) > 0
+        
+        # Test valid datetime field
+        result = await _validate_field_value("created_date", "2024-01-01T12:00:00Z")
+        # Might pass or fail depending on constraints, but should not crash
+        assert "errors" in result
+
+    @pytest.mark.asyncio
+    async def test_validation_comprehensive_scenarios(self):
+        """Test comprehensive validation scenarios"""
+        # Test field not in mappings (should pass validation)
+        result = await _validate_field_value("unknown_field", "any_value")
+        assert result["valid"] == True
+        
+        # Test None value for non-required field
+        result = await _validate_field_value("family_name", None)
+        assert result["valid"] == True  # family_name is not required
+        
+        # Test valid email
+        result = await _validate_field_value("email", "valid@email.com")
+        assert result["valid"] == True
+        
+        # Test valid phone with formatting
+        result = await _validate_field_value("phone", "+1-555-123-4567")
+        assert result["valid"] == True

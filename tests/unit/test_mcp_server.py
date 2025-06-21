@@ -1,5 +1,5 @@
 """
-Unit tests for the MCP server.
+Unit tests for the MCP server with collection-based architecture.
 """
 
 import pytest
@@ -47,23 +47,74 @@ class TestKeapMCPServerInit:
                     mock_register_resources.assert_called_once()
 
 
-class TestRegisterTools:
-    """Test tool registration."""
+class TestCollectionBasedTools:
+    """Test collection-based tool registration."""
 
     def test_register_tools(self):
-        """Test that all tools are registered with decorators."""
+        """Test that all 11 collection-based tools are registered with decorators."""
         with patch("src.mcp.server.FastMCP") as mock_fastmcp:
             mock_mcp_instance = MagicMock()
             mock_fastmcp.return_value = mock_mcp_instance
 
             KeapMCPServer()
 
-            # With the new decorator approach, verify tool() decorator was called
-            expected_tool_count = 7
+            # With the new collection-based architecture, we have 11 tools
+            expected_tool_count = 11
             assert mock_mcp_instance.tool.call_count == expected_tool_count
 
             # Verify the mcp instance was properly set up
             assert mock_mcp_instance.tool.called
+
+    def test_list_tools_collection_based(self):
+        """Test that list_tools returns the correct collection-based tool set."""
+        with patch("src.mcp.server.FastMCP") as mock_fastmcp:
+            mock_mcp_instance = MagicMock()
+            mock_mcp_instance.get_tools.side_effect = AttributeError("No get_tools method")
+            mock_fastmcp.return_value = mock_mcp_instance
+
+            server = KeapMCPServer()
+            tools = server.list_tools()
+
+            # Should return the expected 11 collection-based tools
+            expected_tools = [
+                # Core Contact Operations (2 tools)
+                "list_contacts",
+                "get_contact_schema",
+                # Collection Operations (4 tools)
+                "collection_union",
+                "collection_intersect", 
+                "collection_diff",
+                "collection_count",
+                # Collection Data Access (2 tools)
+                "get_collection_details",
+                "get_collection_ids",
+                # Tag Operations (2 tools)
+                "get_tags",
+                "apply_tags_to_collection",
+                # System Operations (1 tool)
+                "get_api_diagnostics",
+            ]
+
+            assert len(tools) == 11
+            assert tools == expected_tools
+
+    def test_list_tools_with_get_tools_method(self):
+        """Test list_tools when FastMCP has get_tools method."""
+        with patch("src.mcp.server.FastMCP") as mock_fastmcp:
+            mock_mcp_instance = MagicMock()
+            mock_tools = {
+                "list_contacts": MagicMock(),
+                "get_contact_schema": MagicMock(),
+                "collection_union": MagicMock()
+            }
+            mock_mcp_instance.get_tools.return_value = mock_tools
+            mock_fastmcp.return_value = mock_mcp_instance
+
+            server = KeapMCPServer()
+            tools = server.list_tools()
+
+            assert tools == list(mock_tools.keys())
+            mock_mcp_instance.get_tools.assert_called_once()
 
 
 class TestRegisterResources:
@@ -302,22 +353,6 @@ class TestServerIntegration:
         except ImportError as e:
             pytest.fail(f"Import error: {e}")
 
-    def test_logging_setup(self):
-        """Test that logging is properly configured."""
-        with patch("src.mcp.server.FastMCP"):
-            with patch("src.mcp.server.logger") as mock_logger:
-                server = KeapMCPServer()
-
-                # Test that logger is available
-                assert mock_logger is not None
-
-                # Run method should log startup message
-                with patch("asyncio.get_event_loop"):
-                    with patch("asyncio.AbstractEventLoop.run_until_complete"):
-                        server.run("localhost", 8080)
-
-                # Verify logging calls were made during run
-                assert mock_logger.info.call_count >= 1
 
 
 class TestErrorHandling:

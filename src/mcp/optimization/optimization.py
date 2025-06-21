@@ -326,17 +326,33 @@ class QueryExecutor:
         **kwargs,
     ) -> Tuple[List[Dict[str, Any]], int, int, int]:
         """Execute with maximum server-side optimization."""
-        from src.utils.filter_utils import (
-            optimize_filters_for_api,
-            apply_complex_filters,
-        )
-
-        # Optimize filters
-        server_params, client_filters = optimize_filters_for_api(filters)
+        # Simple filter optimization - map common filters to API parameters
+        server_params = {}
+        client_filters = []
+        
+        for filter_item in filters:
+            field = filter_item.get("field", "")
+            operator = filter_item.get("operator", "")
+            value = filter_item.get("value", "")
+            
+            # Map email filters to API parameters
+            if field == "email" and operator == "contains":
+                server_params["email"] = f"*{value}*"
+            elif field == "given_name" and operator == "contains":
+                server_params["given_name"] = f"*{value}*"
+            elif field == "family_name" and operator == "contains":
+                server_params["family_name"] = f"*{value}*"
+            else:
+                # Keep for client-side filtering
+                client_filters.append(filter_item)
 
         # Execute API call
         if query_type == "list_contacts":
             params = {"limit": limit, "offset": offset, **server_params}
+            if kwargs.get("order_by"):
+                params["order_by"] = kwargs["order_by"]
+            if kwargs.get("order_direction"):
+                params["order_direction"] = kwargs["order_direction"]
             response = await self.api_client.get_contacts(**params)
             results = response.get("contacts", [])
         else:
@@ -345,7 +361,7 @@ class QueryExecutor:
 
         # Apply remaining client-side filters
         if client_filters:
-            results = apply_complex_filters(results, client_filters)
+            results = await self._apply_client_side_filters(results, client_filters)
 
         api_calls = 1
         server_filters = len(filters) - len(client_filters)
@@ -388,29 +404,30 @@ class QueryExecutor:
 
         if query_type == "list_contacts":
             # Build server parameters from server-side filters
-            from src.utils.filter_utils import optimize_filters_for_api
-
-            # Convert server_filters dict to list format for optimize_filters_for_api
+            server_params = {}
+            
+            # Convert server_filters to API parameters
             if isinstance(server_filters, dict):
-                server_filter_list = [{"field": k, "operator": "=", "value": v} for k, v in server_filters.items()]
+                server_params.update(server_filters)
             else:
-                server_filter_list = server_filters
-                
-            server_params, remaining_client_filters = optimize_filters_for_api(
-                server_filter_list
-            )
+                for filter_item in server_filters:
+                    field = filter_item.get("field", "")
+                    value = filter_item.get("value", "")
+                    if field in ["email", "given_name", "family_name"]:
+                        server_params[field] = value
 
             # Execute API call
             params = {"limit": limit, "offset": offset, **server_params}
+            if kwargs.get("order_by"):
+                params["order_by"] = kwargs["order_by"]
+            if kwargs.get("order_direction"):
+                params["order_direction"] = kwargs["order_direction"]
             response = await self.api_client.get_contacts(**params)
             results = response.get("contacts", [])
 
             # Apply client-side filters
-            all_client_filters = client_filters + remaining_client_filters
-            if all_client_filters:
-                results = await self._apply_client_side_filters(
-                    results, all_client_filters
-                )
+            if client_filters:
+                results = await self._apply_client_side_filters(results, client_filters)
         else:
             results = []
 
@@ -499,11 +516,14 @@ class QueryExecutor:
                 field_id = filter_condition.get("field_id")
 
                 if field == "custom_field":
-                    # Import here to avoid circular imports
-                    from src.utils.contact_utils import get_custom_field_value
-
+                    # Handle custom field filtering inline
                     if field_id:
-                        contact_value = get_custom_field_value(contact, field_id)
+                        contact_value = None
+                        custom_fields = contact.get("custom_fields", [])
+                        for cf in custom_fields:
+                            if cf.get("id") == field_id:
+                                contact_value = cf.get("content")
+                                break
                     else:
                         # Fallback to searching all custom fields for the value
                         contact_value = None

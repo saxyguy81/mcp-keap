@@ -417,16 +417,40 @@ class KeapApiService:
 
     # Contact Methods
     async def get_contacts(
-        self, limit: int = 200, offset: int = 0, **filters
+        self, limit: int = 200, offset: int = 0, include_custom_fields: bool = True, 
+        include_tags: bool = True, **filters
     ) -> Dict[str, Any]:
         """Get contacts with optional filters"""
         params = {"limit": limit, "offset": offset}
+        
+        # Build optional_properties for efficient data fetching
+        if "optional_properties" not in filters:
+            optional_props = []
+            if include_custom_fields:
+                optional_props.append("custom_fields")
+            if include_tags:
+                optional_props.append("tag_ids")
+            
+            if optional_props:
+                params["optional_properties"] = ",".join(optional_props)
+        
         params.update(filters)
         return await self.get("/contacts", params)
 
-    async def get_contact(self, contact_id: str) -> Dict[str, Any]:
+    async def get_contact(self, contact_id: str, include_custom_fields: bool = True, 
+                         include_tags: bool = True) -> Dict[str, Any]:
         """Get a specific contact by ID"""
-        return await self.get(f"/contacts/{contact_id}")
+        optional_props = []
+        if include_custom_fields:
+            optional_props.append("custom_fields")
+        if include_tags:
+            optional_props.append("tag_ids")
+        
+        if optional_props:
+            params = {"optional_properties": ",".join(optional_props)}
+            return await self.get(f"/contacts/{contact_id}", params)
+        else:
+            return await self.get(f"/contacts/{contact_id}")
 
     async def create_contact(self, contact_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new contact"""

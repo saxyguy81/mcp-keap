@@ -31,8 +31,9 @@ class KeapMCPServer:
         self._register_resources()
 
     def _register_tools(self):
-        """Register MCP tools with proper decorators"""
+        """Register collection-based MCP tools with proper decorators"""
 
+        # Core Contact Operations (2 tools)
         @self.mcp.tool()
         async def list_contacts(
             filters=None,
@@ -40,85 +41,156 @@ class KeapMCPServer:
             offset: int = 0,
             order_by=None,
             order_direction: str = "ASC",
-            include=None,
         ):
-            """List contacts with optional filtering and pagination.
-
-            This function now uses the optimized query engine for better performance.
-            For advanced features like performance metrics, use query_contacts_optimized directly.
+            """Universal contact search with comprehensive filters, returns collection ID.
+            
+            This is the primary contact search tool that replaces search_contacts_by_email,
+            search_contacts_by_name, query_contacts_by_custom_field, etc.
+            
+            Example filters:
+                [{"field": "email", "operator": "contains", "value": "@company.com"}]
+                [{"field": "given_name", "operator": "equals", "value": "John"}]
+                [{"field": "custom_field_7", "operator": "equals", "value": "VIP"}]
+                [{"field": "tags", "operator": "contains", "value": "customer"}]
             """
-            # Import here to avoid circular imports
-            from src.mcp.tools import query_contacts_optimized
+            from src.mcp.tools_collections import list_contacts as _list_contacts
             from mcp.server.fastmcp import Context
 
-            # Create a context - for now, use a basic one
             context = Context()
-
-            # Use the optimized query function internally but maintain the simple interface
-            result = await query_contacts_optimized(
-                context=context,
-                filters=filters,
-                limit=limit,
-                offset=offset,
-                order_by=order_by,
-                order_direction=order_direction,
-                include=include,
-                enable_optimization=True,
-                return_metrics=False,
-            )
-
-            # Return just the contacts list for backward compatibility
-            return result["contacts"]
+            return await _list_contacts(context, filters, limit, offset, order_by, order_direction)
 
         @self.mcp.tool()
-        async def search_contacts_by_email(email: str):
-            """Search for contacts by email address."""
-            from src.mcp.tools import search_contacts_by_email as _search
+        async def get_contact_schema():
+            """Get available fields, custom fields, and filter examples.
+            
+            Returns comprehensive schema information to help construct filters
+            for the list_contacts function.
+            """
+            from src.mcp.tools_collections import get_contact_schema as _get_schema
             from mcp.server.fastmcp import Context
 
             context = Context()
-            return await _search(context, email)
+            return await _get_schema(context)
+
+        # Collection Operations (4 tools)
+        @self.mcp.tool()
+        async def collection_union(collection_a: str, collection_b: str):
+            """Combine two collections (A ∪ B).
+            
+            Args:
+                collection_a: First collection ID
+                collection_b: Second collection ID
+            """
+            from src.mcp.tools_collections import collection_union as _union
+            from mcp.server.fastmcp import Context
+
+            context = Context()
+            return await _union(context, collection_a, collection_b)
 
         @self.mcp.tool()
-        async def search_contacts_by_name(name: str, limit: int = 50):
-            """Search for contacts by name."""
-            from src.mcp.tools import search_contacts_by_name as _search
+        async def collection_intersect(collection_a: str, collection_b: str):
+            """Find contacts in both collections (A ∩ B).
+            
+            Args:
+                collection_a: First collection ID
+                collection_b: Second collection ID
+            """
+            from src.mcp.tools_collections import collection_intersect as _intersect
             from mcp.server.fastmcp import Context
 
             context = Context()
-            return await _search(context, name, limit)
+            return await _intersect(context, collection_a, collection_b)
 
+        @self.mcp.tool()
+        async def collection_diff(collection_a: str, collection_b: str):
+            """Find contacts in first but not second collection (A - B).
+            
+            Args:
+                collection_a: First collection ID
+                collection_b: Second collection ID
+            """
+            from src.mcp.tools_collections import collection_diff as _diff
+            from mcp.server.fastmcp import Context
+
+            context = Context()
+            return await _diff(context, collection_a, collection_b)
+
+        @self.mcp.tool()
+        async def collection_count(collection_id: str):
+            """Get collection size without fetching data.
+            
+            Args:
+                collection_id: Collection identifier
+            """
+            from src.mcp.tools_collections import collection_count as _count
+            from mcp.server.fastmcp import Context
+
+            context = Context()
+            return await _count(context, collection_id)
+
+        # Collection Data Access (2 tools)
+        @self.mcp.tool()
+        async def get_collection_details(collection_id: str, fields=None):
+            """Fetch contact data with field selection from collection.
+            
+            Args:
+                collection_id: Collection identifier
+                fields: List of fields to include (None for all fields)
+            """
+            from src.mcp.tools_collections import get_collection_details as _get_details
+            from mcp.server.fastmcp import Context
+
+            context = Context()
+            return await _get_details(context, collection_id, fields)
+
+        @self.mcp.tool()
+        async def get_collection_ids(collection_id: str):
+            """Get raw contact ID list from collection.
+            
+            Args:
+                collection_id: Collection identifier
+            """
+            from src.mcp.tools_collections import get_collection_ids as _get_ids
+            from mcp.server.fastmcp import Context
+
+            context = Context()
+            return await _get_ids(context, collection_id)
+
+        # Tag Operations (2 tools)
         @self.mcp.tool()
         async def get_tags(category_id=None, limit: int = 200):
-            """Get available tags, optionally filtered by category."""
-            from src.mcp.tools import get_tags as _get_tags
+            """List available tags with optional filtering.
+            
+            Args:
+                category_id: Optional category filter
+                limit: Maximum number of tags
+            """
+            from src.mcp.tools_collections import get_tags as _get_tags
             from mcp.server.fastmcp import Context
 
             context = Context()
             return await _get_tags(context, category_id, limit)
 
         @self.mcp.tool()
-        async def get_contacts_with_tag(tag_id: int, limit: int = 200):
-            """Get contacts that have a specific tag."""
-            from src.mcp.tools import get_contacts_with_tag as _get
+        async def apply_tags_to_collection(collection_id: str, tag_ids, operation: str = "add"):
+            """Bulk tag operations on contact collections.
+            
+            Args:
+                collection_id: Collection identifier
+                tag_ids: List of tag IDs to apply/remove
+                operation: "add" or "remove"
+            """
+            from src.mcp.tools_collections import apply_tags_to_collection as _apply_tags
             from mcp.server.fastmcp import Context
 
             context = Context()
-            return await _get(context, tag_id, limit)
+            return await _apply_tags(context, collection_id, tag_ids, operation)
 
-        @self.mcp.tool()
-        async def set_custom_field_values(contact_id: int, field_values):
-            """Set custom field values for a contact."""
-            from src.mcp.tools import set_custom_field_values as _set
-            from mcp.server.fastmcp import Context
-
-            context = Context()
-            return await _set(context, contact_id, field_values)
-
+        # System Operations (1 tool)
         @self.mcp.tool()
         async def get_api_diagnostics():
-            """Get API client diagnostics and health information."""
-            from src.mcp.tools import get_api_diagnostics as _diag
+            """Get comprehensive API diagnostics and performance metrics."""
+            from src.mcp.tools_collections import get_api_diagnostics as _diag
             from mcp.server.fastmcp import Context
 
             context = Context()
@@ -333,14 +405,23 @@ class KeapMCPServer:
         try:
             return list(self.mcp.get_tools().keys())
         except AttributeError:
-            # Fallback - return a count based on what we registered
+            # Fallback - return the new streamlined tool set
             return [
+                # Core Contact Operations (2 tools)
                 "list_contacts",
-                "search_contacts_by_email",
-                "search_contacts_by_name",
+                "get_contact_schema",
+                # Collection Operations (4 tools)
+                "collection_union",
+                "collection_intersect", 
+                "collection_diff",
+                "collection_count",
+                # Collection Data Access (2 tools)
+                "get_collection_details",
+                "get_collection_ids",
+                # Tag Operations (2 tools)
                 "get_tags",
-                "get_contacts_with_tag",
-                "set_custom_field_values",
+                "apply_tags_to_collection",
+                # System Operations (1 tool)
                 "get_api_diagnostics",
             ]
 

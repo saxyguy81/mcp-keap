@@ -29,8 +29,8 @@ class TestMinimalMCPServer:
     @pytest.fixture
     def mock_api_dependencies(self):
         """Mock all API dependencies to focus on MCP functionality."""
-        with patch("src.mcp.tools.get_api_client") as mock_get_api, \
-             patch("src.mcp.tools.get_cache_manager") as mock_get_cache, \
+        with patch("src.api.client.KeapApiService") as mock_get_api, \
+             patch("src.cache.manager.CacheManager") as mock_get_cache, \
              patch("src.api.client.KeapApiService") as mock_keap_service:
             
             # Mock API client
@@ -83,14 +83,18 @@ class TestMinimalMCPServer:
         # Get list of registered tools
         tools = server.list_tools()
         
-        # Verify core MCP tools are registered
+        # Verify core MCP tools are registered (collection-based architecture)
         expected_tools = [
             "list_contacts",
-            "search_contacts_by_email", 
-            "search_contacts_by_name",
+            "get_contact_schema",
+            "collection_union",
+            "collection_intersect",
+            "collection_diff",
+            "collection_count",
+            "get_collection_details",
+            "get_collection_ids",
             "get_tags",
-            "get_contacts_with_tag",
-            "set_custom_field_values",
+            "apply_tags_to_collection",
             "get_api_diagnostics"
         ]
         
@@ -110,9 +114,9 @@ class TestMinimalMCPServer:
         try:
             # Use FastMCP's call_tool method if available
             if hasattr(server.mcp, 'call_tool'):
-                # Test calling a simple tool - mock the API diagnostics properly
-                with patch('src.mcp.tools.get_api_diagnostics') as mock_diag:
-                    mock_diag.return_value = {"status": "ok", "version": "test"}
+                # Test calling a simple tool - mock the API diagnostics properly for network simulation
+                with patch('src.mcp.tools_collections.get_api_diagnostics') as mock_diag:
+                    mock_diag.return_value = {"status": "ok", "version": "test", "api_health": "mocked"}
                     result = await server.mcp.call_tool("get_api_diagnostics", {})
                     assert result is not None
                 
@@ -166,7 +170,7 @@ class TestMinimalMCPServer:
         
         # Verify tools are accessible
         tools = server.list_tools()
-        assert len(tools) >= 5  # Should have at least 5 core tools
+        assert len(tools) >= 11  # Should have exactly 11 collection-based tools
         
         # Verify server configuration
         assert server.name == "test-core-functionality"
@@ -175,14 +179,14 @@ class TestMinimalMCPServer:
     def test_mcp_server_with_mock_tools(self, mock_environment, mock_api_dependencies):
         """Test MCP server functionality with properly mocked tool dependencies."""
         # Mock the tool imports at the server level
-        with patch('src.mcp.tools.query_contacts_optimized') as mock_query, \
-             patch('src.mcp.tools.search_contacts_by_email') as mock_search_email, \
-             patch('src.mcp.tools.get_api_diagnostics') as mock_diagnostics:
+        with patch('src.mcp.tools_collections.list_contacts') as mock_list, \
+             patch('src.mcp.tools_collections.get_contact_schema') as mock_schema, \
+             patch('src.mcp.tools_collections.get_api_diagnostics') as mock_diagnostics:
             
-            # Setup mock returns
-            mock_query.return_value = {"contacts": []}
-            mock_search_email.return_value = []
-            mock_diagnostics.return_value = {"status": "ok", "version": "test"}
+            # Setup mock returns for collection architecture  
+            mock_list.return_value = {"collection_id": "test_123", "count": 0}
+            mock_schema.return_value = {"standard_fields": [], "custom_fields": []}
+            mock_diagnostics.return_value = {"status": "ok", "version": "test", "network_health": "simulated"}
             
             # Create server
             server = KeapMCPServer("test-mock-tools")
@@ -195,6 +199,7 @@ class TestMinimalMCPServer:
             # Verify that tools can be listed without errors
             assert "list_contacts" in tools
             assert "get_api_diagnostics" in tools
+            assert "collection_union" in tools  # Verify collection-based tools
 
     def test_server_tool_count_and_names(self, mock_environment, mock_api_dependencies):
         """Test that server registers the expected number and names of tools."""
@@ -202,17 +207,21 @@ class TestMinimalMCPServer:
         
         tools = server.list_tools()
         
-        # Should have exactly 7 core tools
-        assert len(tools) == 7
+        # Should have exactly 11 collection-based tools
+        assert len(tools) == 11
         
-        # Verify all expected tool names
+        # Verify all expected tool names (collection-based architecture)
         expected_tools = {
             "list_contacts",
-            "search_contacts_by_email",
-            "search_contacts_by_name", 
+            "get_contact_schema",
+            "collection_union",
+            "collection_intersect",
+            "collection_diff",
+            "collection_count",
+            "get_collection_details",
+            "get_collection_ids",
             "get_tags",
-            "get_contacts_with_tag",
-            "set_custom_field_values",
+            "apply_tags_to_collection",
             "get_api_diagnostics"
         }
         
@@ -227,8 +236,8 @@ class TestMinimalMCPServer:
             from fastmcp import FastMCP
             
             # Test that server can be created (this tests import dependencies)
-            with patch("src.mcp.tools.get_api_client"), \
-                 patch("src.mcp.tools.get_cache_manager"):
+            with patch("src.api.client.KeapApiService"), \
+                 patch("src.cache.manager.CacheManager"):
                 server = KeapMCPServer("test-imports")
                 assert server is not None
                 

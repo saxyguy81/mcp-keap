@@ -4,76 +4,72 @@
 [![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11-blue.svg)](https://github.com/yourusername/keapmcp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A high-performance Model Context Protocol (MCP) server for interacting with Keap CRM data with advanced features including HTTP/2 support, comprehensive diagnostics, and bulk operations.
+A high-performance Model Context Protocol (MCP) server for interacting with Keap CRM data using a **collection-based architecture** for powerful, composable contact operations with advanced features including HTTP/2 support, comprehensive diagnostics, and bulk operations.
 
 ## Features
 
+### Collection-Based Architecture
+- **Named Contact Collections** - Work with logical groups of contacts using unique collection IDs
+- **Set Operations** - Union, intersection, and difference operations on contact collections
+- **Lazy Evaluation** - Operations on collections don't fetch data until explicitly requested
+- **Memory Efficient** - Collections store only contact IDs until detailed data is needed
+- **Composable Workflows** - Chain operations together for complex contact management tasks
+
 ### Core Contact & Tag Management
-- **Comprehensive Contact Management** - List, search, filter, and get detailed contact information
-- **Advanced Tag Operations** - Full tag lifecycle management including creation, querying, and batch operations
-- **Batch Tag Operations** - Apply or remove multiple tags from multiple contacts efficiently
-- **Custom Field Operations** - Search contacts by custom field values and bulk update custom fields
+- **Universal Contact Search** - Single powerful search tool with comprehensive filtering options
+- **Schema Discovery** - Runtime discovery of available fields, custom fields, and filter operators
+- **Advanced Tag Operations** - Tag lifecycle management and bulk operations on collections
+- **Custom Field Operations** - Query and bulk update custom fields across contact collections
 - **Complex Logical Filtering** - Support for AND, OR, NOT operators with nested conditions
 
 ### Performance & Optimization
 - **HTTP/2 Support** - Enhanced connection performance with connection pooling
 - **Intelligent Rate Limiting** - Daily request limits with adaptive backoff strategies
-- **Query Optimization** - Intelligent server-side vs client-side filtering with performance analytics
+- **Server-Side Operations** - Collection operations reduce API calls and improve performance
 - **Performance Monitoring** - Real-time query analysis and optimization suggestions
 - **Persistent Caching** - SQLite-based caching to reduce API calls and improve performance
 
 ### Advanced Features
 - **Comprehensive Diagnostics** - API performance metrics, system monitoring, and health checks
 - **Enhanced Error Handling** - Robust retry logic with exponential backoff for different error types
-- **Bulk Custom Field Updates** - Efficiently set custom field values across multiple contacts
+- **Bulk Operations** - Efficiently operate on hundreds or thousands of contacts via collections
 - **Advanced Filter Operators** - 15+ operators including BETWEEN, IN, SINCE, STARTS_WITH, etc.
-- **ID List Operations** - Utility functions for working with contact and tag ID sets
 
 ## Architecture
 
-The Keap MCP Server uses a streamlined, high-performance architecture:
+The Keap MCP Server uses a collection-based, high-performance architecture:
 
 - **API Client** (`src/api/client.py`) - Enhanced Keap API communication with HTTP/2, rate limiting, and diagnostics
-- **MCP Tools** (`src/mcp/`) - Comprehensive MCP protocol implementation with optimization
+- **Collection Manager** (`src/cache/collections.py`) - In-memory collection storage and set operations
+- **MCP Tools** (`src/mcp/`) - Streamlined MCP protocol implementation with collection operations
 - **Cache Manager** (`src/cache/`) - SQLite-based persistent caching with intelligent invalidation
-- **Optimization Engine** (`src/mcp/optimization/`) - Query optimization and performance analytics
 - **Schemas** (`src/schemas/`) - Data validation and models
 - **Utils** (`src/utils/`) - Shared utilities for contact processing and filtering
 
 ## MCP Tools
 
-The server exposes 17 comprehensive MCP tools:
+The server exposes **11 streamlined MCP tools** using a collection-based architecture:
 
-### Contact Operations
-1. `list_contacts` - List contacts with filtering and pagination (now optimized)
-2. `search_contacts_by_email` - Find contacts by email address
-3. `search_contacts_by_name` - Find contacts by name
-4. `get_contact_details` - Get detailed information about a specific contact
-5. `query_contacts_by_custom_field` - Query contacts by custom field value
+### Core Contact Operations (2 tools)
+1. **`list_contacts`** - Universal search with comprehensive filters, returns collection ID
+2. **`get_contact_schema`** - Get available fields, custom fields, and filter examples
 
-### Tag Operations  
-6. `get_tags` - Retrieve tags with optional filtering
-7. `get_tag_details` - Get detailed information about a specific tag
-8. `get_contacts_with_tag` - Get contacts that have a specific tag
-9. `create_tag` - Create a new tag
+### Collection Operations (4 tools)  
+3. **`collection_union`** - Combine two collections (A ∪ B)
+4. **`collection_intersect`** - Find contacts in both collections (A ∩ B)
+5. **`collection_diff`** - Find contacts in first but not second collection (A - B)
+6. **`collection_count`** - Get collection size without fetching data
 
-### Tag Management (Batch Operations)
-10. `modify_tags` - Add or remove tags from contacts
-11. `apply_tags_to_contacts` - Apply multiple tags to multiple contacts using batch operations
-12. `remove_tags_from_contacts` - Remove multiple tags from multiple contacts
+### Collection Data Access (2 tools)
+7. **`get_collection_details`** - Fetch contact data with field selection from collection
+8. **`get_collection_ids`** - Get raw contact ID list from collection
 
-### Custom Field Management
-13. `set_custom_field_values` - Bulk update custom field values across multiple contacts
+### Tag Operations (2 tools)
+9. **`get_tags`** - List available tags with optional filtering
+10. **`apply_tags_to_collection`** - Bulk tag operations on contact collections
 
-### Advanced Query & Performance Operations
-14. `query_contacts_optimized` - Advanced contact query with optimization and performance analytics
-15. `analyze_query_performance` - Analyze query performance and optimization potential
-
-### System Operations
-16. `get_api_diagnostics` - Comprehensive API diagnostics and performance metrics
-
-### Utility Operations
-17. `intersect_id_lists` - Find the intersection of multiple ID lists
+### System Operations (1 tool)
+11. **`get_api_diagnostics`** - Comprehensive API diagnostics and performance metrics
 
 ## Getting Started
 
@@ -198,142 +194,170 @@ python -m pytest tests/ --cov=src --cov-fail-under=90
 python -m pytest tests/integration/ -v
 ```
 
-## Using the MCP Server
+## Using the Collection-Based MCP Server
 
-### Example: List Contacts (Now Optimized)
+### Collection-Based Workflow Example
 
 ```json
+// 1. Search for all company contacts (returns collection ID)
 {
   "function": "list_contacts",
   "params": {
     "filters": [
       { "field": "email", "operator": "contains", "value": "@company.com" }
-    ],
-    "limit": 50,
-    "include": ["id", "given_name", "family_name", "email"]
+    ]
+  }
+}
+// Returns: {"collection_id": "contacts_001", "count": 150}
+
+// 2. Search for VIP customers (returns collection ID)
+{
+  "function": "list_contacts", 
+  "params": {
+    "filters": [
+      { "field": "tags", "operator": "contains", "value": "VIP" }
+    ]
+  }
+}
+// Returns: {"collection_id": "contacts_002", "count": 45}
+
+// 3. Find company VIP customers (intersection)
+{
+  "function": "collection_intersect",
+  "params": {
+    "collection_a": "contacts_001",
+    "collection_b": "contacts_002"
+  }
+}
+// Returns: {"collection_id": "contacts_003", "count": 12}
+
+// 4. Get detailed info for the intersection
+{
+  "function": "get_collection_details",
+  "params": {
+    "collection_id": "contacts_003",
+    "fields": ["id", "given_name", "family_name", "email", "tags"]
+  }
+}
+// Returns: full contact details for the 12 VIP company contacts
+```
+
+### Universal Search Examples
+
+```json
+// Email search
+{
+  "function": "list_contacts",
+  "params": {
+    "filters": [
+      { "field": "email", "operator": "equals", "value": "john@company.com" }
+    ]
+  }
+}
+
+// Name search  
+{
+  "function": "list_contacts",
+  "params": {
+    "filters": [
+      { "field": "given_name", "operator": "contains", "value": "John" }
+    ]
+  }
+}
+
+// Custom field search
+{
+  "function": "list_contacts",
+  "params": {
+    "filters": [
+      { "field": "custom_field_7", "operator": "equals", "value": "VIP" }
+    ]
+  }
+}
+
+// Complex multi-criteria search
+{
+  "function": "list_contacts",
+  "params": {
+    "filters": [
+      { "field": "email", "operator": "contains", "value": "@company.com" },
+      { "field": "tags", "operator": "contains", "value": "customer" },
+      { "field": "date_created", "operator": "after", "value": "2024-01-01" }
+    ]
   }
 }
 ```
 
-*Note: `list_contacts` now uses the optimization engine internally for better performance. For detailed performance metrics, use `query_contacts_optimized` directly.*
-
-### Example: Search by Email
+### Schema Discovery
 
 ```json
 {
-  "function": "search_contacts_by_email",
+  "function": "get_contact_schema",
+  "params": {}
+}
+// Returns: available fields, custom fields, operators, and examples
+```
+
+### Collection Set Operations
+
+```json
+// Union (combine collections)
+{
+  "function": "collection_union",
   "params": {
-    "email": "john.doe@company.com",
-    "include": ["id", "given_name", "family_name", "email", "tags"]
+    "collection_a": "contacts_001",
+    "collection_b": "contacts_002"
+  }
+}
+
+// Difference (A - B) 
+{
+  "function": "collection_diff",
+  "params": {
+    "collection_a": "contacts_001", 
+    "collection_b": "contacts_002"
+  }
+}
+
+// Count contacts without fetching data
+{
+  "function": "collection_count",
+  "params": {
+    "collection_id": "contacts_001"
   }
 }
 ```
 
-### Example: Get Tags
+### Tag Operations on Collections
 
 ```json
 {
-  "function": "get_tags",
+  "function": "apply_tags_to_collection",
   "params": {
-    "include_categories": true,
-    "limit": 100
-  }
-}
-```
-
-### Example: Batch Tag Operations
-
-```json
-{
-  "function": "apply_tags_to_contacts",
-  "params": {
+    "collection_id": "contacts_003",
     "tag_ids": ["123", "456"],
-    "contact_ids": ["1001", "1002", "1003"]
+    "operation": "add"
   }
 }
 ```
 
-### Example: Custom Field Query
-
-```json
-{
-  "function": "query_contacts_by_custom_field",
-  "params": {
-    "field_id": "7",
-    "field_value": "Engineering",
-    "operator": "contains",
-    "include": ["id", "given_name", "family_name", "email"]
-  }
-}
-```
-
-### Example: Create New Tag
-
-```json
-{
-  "function": "create_tag",
-  "params": {
-    "name": "VIP Customer",
-    "description": "High-value customer segment",
-    "category_id": "2"
-  }
-}
-```
-
-### Example: Bulk Custom Field Updates
-
-```json
-{
-  "function": "set_custom_field_values",
-  "params": {
-    "field_id": "7",
-    "contact_ids": ["1001", "1002", "1003"],
-    "common_value": "VIP Customer"
-  }
-}
-```
-
-Or with individual values per contact:
-
-```json
-{
-  "function": "set_custom_field_values",
-  "params": {
-    "field_id": "7",
-    "contact_values": {
-      "1001": "Gold Tier",
-      "1002": "Silver Tier", 
-      "1003": "Bronze Tier"
-    }
-  }
-}
-```
-
-### Example: API Diagnostics
+### System Diagnostics
 
 ```json
 {
   "function": "get_api_diagnostics",
   "params": {}
 }
-```
-
-### Example: ID List Intersection
-
-```json
-{
-  "function": "intersect_id_lists",
-  "params": {
-    "lists": [
-      {"list_id": "active_contacts", "item_ids": ["1", "2", "3", "4"]},
-      {"list_id": "newsletter_subscribers", "item_ids": ["2", "3", "5", "6"]}
-    ],
-    "id_field": "item_ids"
-  }
-}
+// Returns: API performance metrics, system monitoring, and health checks
 ```
 
 ## Performance Features
+
+### Collection-Based Efficiency
+- **Lazy Evaluation**: Operations on collections don't fetch data until requested
+- **Server-Side Operations**: Collection set operations reduce API calls
+- **Memory Optimization**: Collections store only contact IDs until data is needed
+- **Composable Workflows**: Chain operations for complex contact management
 
 ### HTTP/2 Support
 The server uses HTTP/2 for enhanced performance with connection pooling and keepalive connections.
@@ -344,9 +368,9 @@ The server uses HTTP/2 for enhanced performance with connection pooling and keep
 - Rate limit monitoring and diagnostics
 
 ### Caching Strategy
-- SQLite-based persistent caching
+- SQLite-based persistent caching for contact data
+- In-memory collection storage with TTL expiration
 - Intelligent cache invalidation
-- TTL-based expiration
 - Cache hit/miss tracking
 
 ### Error Handling
