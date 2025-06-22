@@ -14,6 +14,38 @@ from fastmcp import FastMCP
 logger = logging.getLogger(__name__)
 
 
+def _parse_json_parameter(value: Union[str, List, Dict], expected_type: str = "list") -> Union[List, Dict]:
+    """Parse JSON string parameter for MCP compatibility.
+    
+    Args:
+        value: Parameter value (JSON string or already parsed)
+        expected_type: Expected type ("list" or "dict")
+        
+    Returns:
+        Parsed parameter
+        
+    Raises:
+        ValueError: If parsing fails or type is incorrect
+    """
+    if isinstance(value, str):
+        try:
+            import json
+            parsed = json.loads(value)
+            if expected_type == "list" and not isinstance(parsed, list):
+                raise ValueError(f"Expected list, got {type(parsed).__name__}")
+            elif expected_type == "dict" and not isinstance(parsed, dict):
+                raise ValueError(f"Expected dict, got {type(parsed).__name__}")
+            return parsed
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON format: {e}")
+    elif expected_type == "list" and isinstance(value, list):
+        return value
+    elif expected_type == "dict" and isinstance(value, dict):
+        return value
+    else:
+        raise ValueError(f"Expected {expected_type} or JSON string, got {type(value).__name__}")
+
+
 class KeapMCPServer:
     """
     Keap MCP Server implementation
@@ -110,58 +142,70 @@ class KeapMCPServer:
 
         # Collection Operations (4 tools)
         @self.mcp.tool()
-        async def collection_union(collection_names):
+        async def collection_union(collection_names: Union[str, List[str]]):
             """Combine multiple collections (A ∪ B ∪ C...).
             
             Args:
-                collection_names: List of collection IDs to combine
+                collection_names: List of collection IDs to combine (or JSON string)
             """
             from src.mcp.tools_collections import collection_union as _union
             from mcp.server.fastmcp import Context
+
+            # Parse collection_names if it's a JSON string
+            collection_names = _parse_json_parameter(collection_names, "list")
 
             context = Context()
             return await _union(context, collection_names)
 
         @self.mcp.tool()
-        async def collection_intersect(collection_names):
+        async def collection_intersect(collection_names: Union[str, List[str]]):
             """Find contacts present in all collections (A ∩ B ∩ C...).
             
             Args:
-                collection_names: List of collection IDs to intersect
+                collection_names: List of collection IDs to intersect (or JSON string)
             """
             from src.mcp.tools_collections import collection_intersect as _intersect
             from mcp.server.fastmcp import Context
+
+            # Parse collection_names if it's a JSON string
+            collection_names = _parse_json_parameter(collection_names, "list")
 
             context = Context()
             return await _intersect(context, collection_names)
 
         @self.mcp.tool()
-        async def collection_diff(base_collection: str, subtract_collections):
+        async def collection_diff(base_collection: str, subtract_collections: Union[str, List[str]]):
             """Find contacts in base but not in any subtract collections (A - B - C...).
             
             Args:
                 base_collection: Base collection ID
-                subtract_collections: List of collection IDs to subtract
+                subtract_collections: List of collection IDs to subtract (or JSON string)
             """
             from src.mcp.tools_collections import collection_diff as _diff
             from mcp.server.fastmcp import Context
+
+            # Parse subtract_collections if it's a JSON string
+            subtract_collections = _parse_json_parameter(subtract_collections, "list")
 
             context = Context()
             return await _diff(context, base_collection, subtract_collections)
 
         @self.mcp.tool()
-        async def create_collection_from_ids(contact_ids, name=None):
+        async def create_collection_from_ids(contact_ids: Union[str, List[Union[int, str]]], name: Optional[str] = None):
             """Create a collection from a list of contact IDs.
             
             This allows you to create collections from specific contact IDs,
             then use other collection-based tools to operate on those contacts.
             
             Args:
-                contact_ids: List of contact IDs to include in collection
+                contact_ids: List of contact IDs to include in collection (or JSON string)
                 name: Optional name for the collection (auto-generated if not provided)
             """
             from src.mcp.tools_collections import create_collection_from_ids as _create_from_ids
             from mcp.server.fastmcp import Context
+
+            # Parse contact_ids if it's a JSON string
+            contact_ids = _parse_json_parameter(contact_ids, "list")
 
             context = Context()
             return await _create_from_ids(context, contact_ids, name)
@@ -221,30 +265,62 @@ class KeapMCPServer:
 
         # Tag Operations (2 tools)
         @self.mcp.tool()
-        async def get_tags(category_id=None, limit: int = 200):
-            """List available tags with optional filtering.
+        async def get_tags(
+            filters: Optional[Union[str, List[Dict[str, Any]]]] = None,
+            category_id: Optional[int] = None, 
+            limit: int = 1000
+        ):
+            """List available tags with optional filtering (like list_contacts).
             
             Args:
-                category_id: Optional category filter
-                limit: Maximum number of tags
+                filters: List of filter objects for tag name, category, id, etc. (or JSON string)
+                    Supported fields:
+                    - "name" or "tag_name": Tag name
+                    - "id": Tag ID
+                    - "category_id": Category ID
+                    - "category_name": Category name (when available)
+                    
+                    Examples:
+                    - [{"field": "name", "operator": "contains", "value": "customer"}]
+                    - [{"field": "tag_name", "operator": "equals", "value": "VIP Customer"}]
+                    - [{"field": "category_name", "operator": "contains", "value": "sales"}]
+                    - [{"field": "category_id", "operator": "equals", "value": 123}]
+                    - [{"field": "id", "operator": "in", "value": [1, 2, 3]}]
+                category_id: Optional category filter (deprecated, use filters instead)
+                limit: Maximum number of tags (increased from 200 to 1000 for consistency)
             """
             from src.mcp.tools_collections import get_tags as _get_tags
             from mcp.server.fastmcp import Context
 
+            # Parse filters if it's a JSON string (for MCP compatibility)
+            if isinstance(filters, str):
+                try:
+                    import json
+                    parsed_filters = json.loads(filters)
+                    if isinstance(parsed_filters, list):
+                        filters = parsed_filters
+                    else:
+                        raise ValueError(f"Filters must be a list, got {type(parsed_filters).__name__}")
+                except json.JSONDecodeError:
+                    raise ValueError("Invalid JSON format for filters")
+
             context = Context()
-            return await _get_tags(context, category_id, limit)
+            return await _get_tags(context, filters, category_id, limit)
 
         @self.mcp.tool()
-        async def modify_collection_tags(collection_id: str, tag_ids, operation: str = "add"):
+        async def modify_collection_tags(collection_id: str, tag_ids: Union[str, List[int]], operation: str = "add"):
             """Bulk tag operations on contact collections.
             
             Args:
                 collection_id: Collection identifier
-                tag_ids: List of tag IDs to apply/remove
+                tag_ids: List of tag IDs to apply/remove (or JSON string)
                 operation: "add" or "remove"
             """
             from src.mcp.tools_collections import modify_collection_tags as _modify_tags
             from mcp.server.fastmcp import Context
+
+            # Parse tag_ids if it's a JSON string
+            tag_ids = _parse_json_parameter(tag_ids, "list")
 
             context = Context()
             return await _modify_tags(context, collection_id, tag_ids, operation)
@@ -276,28 +352,34 @@ class KeapMCPServer:
             return await _get_fields(collection_id, field_names)
 
         @self.mcp.tool()
-        async def set_collection_fields(collection_id: str, field_updates):
+        async def set_collection_fields(collection_id: str, field_updates: Union[str, Dict[str, Any]]):
             """Set field values across all contacts in a collection.
             
             Args:
                 collection_id: Collection identifier
-                field_updates: Dict of field_name -> value pairs
+                field_updates: Dict of field_name -> value pairs (or JSON string)
             """
             from src.mcp.tools_collections import set_collection_fields as _set_fields
+            
+            # Parse field_updates if it's a JSON string
+            field_updates = _parse_json_parameter(field_updates, "dict")
             
             return await _set_fields(collection_id, field_updates)
 
         @self.mcp.tool()
-        async def modify_contact_fields(collection_id: str, field_name: str, contact_values):
+        async def modify_contact_fields(collection_id: str, field_name: str, contact_values: Union[str, Dict[str, Any]]):
             """Modify specific field values for specific contacts in a collection.
             
             Args:
                 collection_id: Collection identifier
                 field_name: Name of the field to modify
-                contact_values: Dict of contact_id -> value mappings
+                contact_values: Dict of contact_id -> value mappings (or JSON string)
             """
             from src.mcp.tools_collections import modify_contact_fields as _modify_fields
             from mcp.server.fastmcp import Context
+
+            # Parse contact_values if it's a JSON string
+            contact_values = _parse_json_parameter(contact_values, "dict")
 
             context = Context()
             return await _modify_fields(context, collection_id, field_name, contact_values)

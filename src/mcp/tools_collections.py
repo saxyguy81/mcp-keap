@@ -83,6 +83,53 @@ def _filter_contact_fields(contact: Dict[str, Any], fields: List[str]) -> Dict[s
     return filtered
 
 
+def _tag_matches_filters(tag: Dict[str, Any], filters: List[Dict[str, Any]]) -> bool:
+    """Check if a tag matches the specified filters.
+    
+    Supports both direct field matching and name-based lookups:
+    - field: "id", "name", "category_id" - direct field access
+    - field: "category_name" - matches against category name (if available)
+    - field: "tag_name" - alias for "name" field
+    
+    Args:
+        tag: Tag object from API  
+        filters: List of filter conditions
+        
+    Returns:
+        True if tag matches all filters (AND logic)
+    """
+    for filter_obj in filters:
+        field = filter_obj.get("field")
+        operator = filter_obj.get("operator")
+        value = filter_obj.get("value")
+        
+        if not field or not operator:
+            continue
+            
+        # Get tag field value with special handling for name-based fields
+        if field == "tag_name":
+            # "tag_name" is an alias for "name"
+            tag_value = tag.get("name")
+        elif field == "category_name":
+            # Try to get category name - might be in category object or as separate field
+            tag_value = None
+            if "category" in tag and isinstance(tag["category"], dict):
+                tag_value = tag["category"].get("name")
+            else:
+                # Some APIs might include category_name directly
+                tag_value = tag.get("category_name")
+        else:
+            # Direct field access for standard fields (id, name, category_id, etc.)
+            tag_value = tag.get(field)
+        
+        # Apply filter condition
+        from src.utils.filter_utils import evaluate_filter_condition
+        if not evaluate_filter_condition(tag_value, operator, value):
+            return False
+    
+    return True
+
+
 # Field type validation mappings
 FIELD_TYPE_MAPPINGS = {
     "email": {"type": "email", "validator": "email_format"},
@@ -1269,15 +1316,29 @@ async def get_collection_details(
 # Tag Operations
 async def get_tags(
     context: Context,
+    filters: Optional[List[Dict[str, Any]]] = None,
     category_id: Optional[int] = None,
-    limit: int = 200
+    limit: int = 1000
 ) -> Dict[str, Any]:
-    """List available tags with optional filtering.
+    """List available tags with optional filtering (similar to list_contacts).
     
     Args:
         context: MCP context
-        category_id: Optional category filter
-        limit: Maximum number of tags
+        filters: List of filter objects for tag name, category, id, etc.
+            Supported fields:
+            - "name" or "tag_name": Tag name 
+            - "id": Tag ID
+            - "category_id": Category ID
+            - "category_name": Category name (when available in API response)
+            
+            Examples:
+            - [{"field": "name", "operator": "contains", "value": "customer"}]
+            - [{"field": "tag_name", "operator": "equals", "value": "VIP Customer"}]
+            - [{"field": "category_name", "operator": "contains", "value": "sales"}]
+            - [{"field": "category_id", "operator": "equals", "value": 123}]
+            - [{"field": "id", "operator": "in", "value": [1, 2, 3]}]
+        category_id: Optional category filter (deprecated, use filters instead)
+        limit: Maximum number of tags (increased default from 200 to 1000)
         
     Returns:
         Dict with tags list and pagination info
@@ -1287,10 +1348,23 @@ async def get_tags(
     try:
         result = await api_client.get_tags(limit=limit)
         
-        # Filter by category if specified
-        if category_id is not None and "tags" in result:
-            filtered_tags = [tag for tag in result["tags"] if tag.get("category_id") == category_id]
-            result = {**result, "tags": filtered_tags, "count": len(filtered_tags)}
+        # Apply filters if specified
+        if "tags" in result:
+            tags = result["tags"]
+            
+            # Apply new-style filters first
+            if filters:
+                filtered_tags = []
+                for tag in tags:
+                    if _tag_matches_filters(tag, filters):
+                        filtered_tags.append(tag)
+                tags = filtered_tags
+            
+            # Apply legacy category_id filter for backward compatibility
+            if category_id is not None:
+                tags = [tag for tag in tags if tag.get("category_id") == category_id]
+            
+            result = {**result, "tags": tags, "count": len(tags)}
         
         return result
         
