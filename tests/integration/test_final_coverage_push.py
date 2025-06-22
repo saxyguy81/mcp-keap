@@ -19,7 +19,7 @@ from src.mcp.tools_collections import (
     collection_count,
     get_collection_ids,
     get_tags,
-    apply_tags_to_collection,
+    modify_collection_tags,
     get_api_diagnostics,
     # Enhanced functions
     get_fields_for_collection_mcp,

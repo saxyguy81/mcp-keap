@@ -17,7 +17,7 @@ from src.mcp.tools_collections import (
     collection_intersect,
     collection_diff,
     get_collection_details,
-    apply_tags_to_collection
+    modify_collection_tags
 )
 from src.cache.collections import get_collection_manager
 
@@ -91,7 +91,7 @@ class TestCollectionWorkflow:
 
         if result["count"] > 0:
             # Note: Only test tag fetching, not application (to avoid modifying real data)
-            # Apply tags would be: await apply_tags_to_collection(context, collection_id, [1], "add")
+            # Apply tags would be: await modify_collection_tags(context, collection_id, [1], "add")
             print(f"Collection {collection_id} with {result['count']} contacts available for tag operations")
             assert True
         else:

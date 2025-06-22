@@ -94,7 +94,7 @@ class TestMinimalMCPServer:
             "get_collection_details",
             "get_collection_ids",
             "get_tags",
-            "apply_tags_to_collection",
+            "modify_collection_tags",
             "get_api_diagnostics"
         ]
         
@@ -221,7 +221,7 @@ class TestMinimalMCPServer:
             "get_collection_details",
             "get_collection_ids",
             "get_tags",
-            "apply_tags_to_collection",
+            "modify_collection_tags",
             "get_api_diagnostics"
         }
         

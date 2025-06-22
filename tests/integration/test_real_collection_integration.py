@@ -21,7 +21,7 @@ from src.mcp.tools_collections import (
     get_collection_details,
     get_collection_ids,
     get_tags,
-    apply_tags_to_collection,
+    modify_collection_tags,
     get_api_diagnostics
 )
 from src.cache.collections import get_collection_manager, CollectionManager

@@ -84,20 +84,18 @@ class TestCollectionBasedTools:
                 "collection_union",
                 "collection_intersect", 
                 "collection_diff",
-                # Collection Data Access (1 enhanced tool)
+                "collection_count",
+                # Collection Data Access (2 tools)
                 "get_collection_details",
-                # Field Management (3 tools)
-                "get_collection_fields",
-                "set_collection_fields",
-                "modify_contact_fields",
+                "get_collection_ids",
                 # Tag Operations (2 tools)
                 "get_tags",
-                "modify_collection_tags",
+                "apply_tags_to_collection",
                 # System Operations (1 tool)
                 "get_api_diagnostics",
             ]
 
-            assert len(tools) == 12
+            assert len(tools) == 11
             assert tools == expected_tools
 
     def test_list_tools_with_get_tools_method(self):

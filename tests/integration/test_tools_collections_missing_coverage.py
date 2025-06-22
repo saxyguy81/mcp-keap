@@ -19,7 +19,7 @@ from src.mcp.tools_collections import (
     get_collection_details,
     get_collection_ids,
     get_tags,
-    apply_tags_to_collection,
+    modify_collection_tags,
     get_api_diagnostics
 )
 
@@ -147,7 +147,7 @@ class TestMissingCoverageScenarios:
         
         for tag_ids, operation in tag_scenarios:
             try:
-                result = await apply_tags_to_collection(
+                result = await modify_collection_tags(
                     context, 
                     collection_id, 
                     tag_ids, 
@@ -358,7 +358,7 @@ class TestMissingCoverageScenarios:
             lambda: get_collection_details(context, "invalid_id"),
             lambda: collection_count(context, "invalid_id"),
             lambda: get_collection_ids(context, "invalid_id"),
-            lambda: apply_tags_to_collection(context, "invalid_id", [1], "add"),
+            lambda: modify_collection_tags(context, "invalid_id", [1], "add"),
             # Invalid parameter operations
             lambda: collection_union(context, valid_collection_id, "invalid_id"),
             lambda: collection_intersect(context, "invalid_id", valid_collection_id),

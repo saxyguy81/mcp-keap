@@ -19,7 +19,7 @@ from src.mcp.tools_collections import (
     get_collection_details,
     get_collection_ids,
     get_tags,
-    apply_tags_to_collection,
+    modify_collection_tags,
     get_api_diagnostics
 )
 
@@ -231,7 +231,7 @@ class TestFinalCoverageTargets:
                 tag_operations = ["add", "remove"]
                 for operation in tag_operations:
                     try:
-                        tag_result = await apply_tags_to_collection(
+                        tag_result = await modify_collection_tags(
                             context, 
                             collection_id, 
                             [1], 

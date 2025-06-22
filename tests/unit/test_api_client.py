@@ -746,18 +746,30 @@ class TestTagOperations:
 
     @pytest.mark.asyncio
     async def test_apply_tag_to_contact_v1(self):
-        """Test applying tag to contact with v1 API."""
+        """Test applying tag to contact with v1 API using multiple format attempts."""
         client = KeapApiService(api_key="test_key", api_version="v1")
 
         mock_result = {"success": True}
 
-        with patch.object(client, "post", new_callable=AsyncMock) as mock_post:
-            mock_post.return_value = mock_result
+        # Mock the _make_request method to simulate PUT failure and POST success
+        with patch.object(client, "_make_request", new_callable=AsyncMock) as mock_request:
+            # First call (PUT) fails, second call (POST) succeeds
+            mock_request.side_effect = [
+                Exception("405 Method Not Allowed"),  # PUT fails
+                mock_result  # POST succeeds
+            ]
+            
+            with patch.object(client, "post", new_callable=AsyncMock) as mock_post:
+                mock_post.return_value = mock_result
 
-            result = await client.apply_tag_to_contact("123", "456")
+                result = await client.apply_tag_to_contact("123", "456")
 
-            assert result == mock_result
-            mock_post.assert_called_once_with("/contacts/123/tags", {"tagId": "456"})
+                # Should return new format with method info
+                expected_result = {"contact_id": "123", "tag_id": 456, "applied": True, "method": "POST_tagIds"}
+                assert result == expected_result
+                
+                # Should try POST with tagIds format
+                mock_post.assert_called_with("/contacts/123/tags", {"tagIds": [456]})
 
     @pytest.mark.asyncio
     async def test_apply_tag_to_contact_v2(self):
