@@ -20,6 +20,69 @@ from src.cache.collections import get_collection_manager
 
 logger = logging.getLogger(__name__)
 
+
+def _extract_field_value(contact: Dict[str, Any], field_name: str) -> Any:
+    """Extract field value from contact, handling custom fields and standard fields.
+    
+    Args:
+        contact: Contact data dictionary from API
+        field_name: Field name to extract (e.g., "given_name", "custom_field_239", "6FN Next Date/Time")
+        
+    Returns:
+        Field value or None if not found
+    """
+    # Try direct field access first
+    if field_name in contact:
+        return contact[field_name]
+    
+    # Handle custom fields that might be in custom_fields array
+    if "custom_fields" in contact and isinstance(contact["custom_fields"], list):
+        for cf in contact["custom_fields"]:
+            if isinstance(cf, dict):
+                # Check if it matches by id (custom_field_N format)
+                if field_name.startswith("custom_field_"):
+                    try:
+                        field_id = int(field_name.replace("custom_field_", ""))
+                        if cf.get("id") == field_id:
+                            return cf.get("content")
+                    except ValueError:
+                        continue
+                
+                # Check if it matches by content/label name
+                if cf.get("content") == field_name or cf.get("label") == field_name:
+                    return cf.get("content")
+    
+    # Handle email_addresses special case
+    if field_name == "email_addresses" and "email_addresses" in contact:
+        return contact["email_addresses"]
+    
+    # Handle special calculated fields
+    if field_name == "email":
+        return _extract_email(contact)
+    
+    # Not found
+    return None
+
+
+def _filter_contact_fields(contact: Dict[str, Any], fields: List[str]) -> Dict[str, Any]:
+    """Filter contact data to include only specified fields.
+    
+    Args:
+        contact: Complete contact data
+        fields: List of field names to include
+        
+    Returns:
+        Dictionary with only the requested fields
+    """
+    filtered = {}
+    for field in fields:
+        value = _extract_field_value(contact, field)
+        # Include field even if value is None (to show it was requested)
+        filtered[field] = value
+    
+    return filtered
+
+
 # Field type validation mappings
 FIELD_TYPE_MAPPINGS = {
     "email": {"type": "email", "validator": "email_format"},
@@ -1089,10 +1152,7 @@ async def get_collection_details(
                     
                     # Apply field filtering if specified
                     if fields:
-                        filtered_contact = {field: contact.get(field) for field in fields if field in contact}
-                        # Always include extracted email if email was requested
-                        if 'email' in fields:
-                            filtered_contact['email'] = contact['email']
+                        filtered_contact = _filter_contact_fields(contact, fields)
                         contacts.append(filtered_contact)
                     else:
                         contacts.append(contact)
@@ -1140,10 +1200,7 @@ async def get_collection_details(
                         
                         # Apply field filtering if specified
                         if fields:
-                            filtered_contact = {field: contact.get(field) for field in fields if field in contact}
-                            # Always include extracted email if email was requested
-                            if 'email' in fields:
-                                filtered_contact['email'] = contact['email']
+                            filtered_contact = _filter_contact_fields(contact, fields)
                             contacts.append(filtered_contact)
                         else:
                             contacts.append(contact)

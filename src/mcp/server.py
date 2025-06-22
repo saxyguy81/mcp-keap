@@ -167,7 +167,7 @@ class KeapMCPServer:
             return await _create_from_ids(context, contact_ids, name)
 
         @self.mcp.tool()
-        async def get_collection_details(collection_id: str, fields=None, count_only=False, limit=None):
+        async def get_collection_details(collection_id: str, fields: Optional[Union[str, List[str]]] = None, count_only: bool = False, limit: Optional[int] = None):
             """Fetch contact data with comprehensive field selection from collection.
             
             This consolidated function replaces collection_count and get_collection_ids.
@@ -202,6 +202,19 @@ class KeapMCPServer:
             """
             from src.mcp.tools_collections import get_collection_details as _get_details
             from mcp.server.fastmcp import Context
+
+            # Parse fields if it's a JSON string (for MCP compatibility)
+            if isinstance(fields, str):
+                try:
+                    import json
+                    parsed_fields = json.loads(fields)
+                    if isinstance(parsed_fields, list):
+                        fields = parsed_fields
+                    else:
+                        raise ValueError(f"Fields must be a list, got {type(parsed_fields).__name__}")
+                except json.JSONDecodeError:
+                    # Assume it's a single field name
+                    fields = [fields]
 
             context = Context()
             return await _get_details(context, collection_id, fields, limit, count_only)
@@ -238,14 +251,27 @@ class KeapMCPServer:
 
         # Field Management Operations (3 tools)
         @self.mcp.tool()
-        async def get_collection_fields(collection_id: str, field_names):
+        async def get_collection_fields(collection_id: str, field_names: Union[str, List[str]]):
             """Get specific field values from all contacts in a collection.
             
             Args:
                 collection_id: Collection identifier
-                field_names: List of field names to retrieve
+                field_names: List of field names to retrieve (or JSON string)
             """
             from src.mcp.tools_collections import get_collection_fields as _get_fields
+            
+            # Parse field_names if it's a JSON string (for MCP compatibility)
+            if isinstance(field_names, str):
+                try:
+                    import json
+                    parsed_fields = json.loads(field_names)
+                    if isinstance(parsed_fields, list):
+                        field_names = parsed_fields
+                    else:
+                        raise ValueError(f"Field names must be a list, got {type(parsed_fields).__name__}")
+                except json.JSONDecodeError:
+                    # Assume it's a single field name
+                    field_names = [field_names]
             
             return await _get_fields(collection_id, field_names)
 
