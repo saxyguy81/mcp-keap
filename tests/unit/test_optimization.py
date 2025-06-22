@@ -3,7 +3,7 @@ Unit tests for the optimization engine.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 from src.mcp.optimization.api_optimization import (
     ApiParameterOptimizer,
@@ -301,7 +301,7 @@ class TestQueryExecutor:
     async def test_execute_optimized_query_direct_api(self):
         """Test execution with bulk retrieve strategy."""
         mock_api_client = AsyncMock()
-        mock_cache_manager = AsyncMock()
+        mock_cache_manager = Mock()
 
         # Mock cache miss
         mock_cache_manager.get.return_value = None
@@ -341,7 +341,7 @@ class TestQueryExecutor:
     async def test_execute_optimized_query_cached_lookup(self):
         """Test execution with cached lookup strategy."""
         mock_api_client = AsyncMock()
-        mock_cache_manager = AsyncMock()
+        mock_cache_manager = Mock()
 
         # Mock cache hit
         mock_contacts = [{"id": 1, "name": "Cached"}]
@@ -366,7 +366,7 @@ class TestQueryExecutor:
     async def test_execute_optimized_query_hybrid_optimization(self):
         """Test execution with hybrid optimization strategy."""
         mock_api_client = AsyncMock()
-        mock_cache_manager = AsyncMock()
+        mock_cache_manager = Mock()
 
         # Mock API response
         mock_contacts = [
@@ -404,31 +404,25 @@ class TestQueryExecutor:
                 return_value=mock_optimization,
             ):
                 with patch(
-                    "src.utils.contact_utils.get_custom_field_value", return_value="VIP"
-                ):
-                    with patch(
-                        "src.utils.contact_utils.format_contact_data",
-                        side_effect=lambda x: x,
-                    ):
-                        with patch(
-                            "time.time", side_effect=[0, 0.150]
-                        ):  # 150ms duration
-                            contacts, metrics = await executor.execute_optimized_query(
-                                "list_contacts",
-                                filters=[
-                                    {
-                                        "field": "email",
-                                        "operator": "contains",
-                                        "value": "@test.com",
-                                    },
-                                    {
-                                        "field": "custom_field",
-                                        "operator": "equals",
-                                        "value": "VIP",
-                                    },
-                                ],
-                                limit=50,
-                            )
+                    "time.time", side_effect=[0, 0.150]
+                ):  # 150ms duration
+                    contacts, metrics = await executor.execute_optimized_query(
+                        "list_contacts",
+                        filters=[
+                            {
+                                "field": "email",
+                                "operator": "contains",
+                                "value": "@test.com",
+                            },
+                            {
+                                "field": "custom_field",
+                                "operator": "equals",
+                                "value": "VIP",
+                                "field_id": 7,  # Match the mock data structure
+                            },
+                        ],
+                        limit=50,
+                    )
 
         assert len(contacts) == 1  # Only VIP contact should match
         assert contacts[0]["id"] == 1
@@ -443,7 +437,7 @@ class TestQueryExecutor:
     async def test_execute_optimized_query_exception(self):
         """Test execution with exception handling."""
         mock_api_client = AsyncMock()
-        mock_cache_manager = AsyncMock()
+        mock_cache_manager = Mock()
 
         # Mock API exception
         mock_api_client.get_contacts.side_effect = Exception("API Error")
@@ -506,17 +500,13 @@ class TestQueryExecutor:
                 "field": "custom_field",
                 "operator": "equals",
                 "value": "VIP",
-                "field_id": "7",
+                "field_id": 7,  # Should be int not string to match contact data
             }
         ]
 
-        with patch("src.utils.contact_utils.get_custom_field_value") as mock_get_field:
-            # Mock field values: VIP, Regular, None (different field)
-            mock_get_field.side_effect = ["VIP", "Regular", None]
-
-            filtered_contacts = await executor._apply_client_side_filters(
-                contacts, filters
-            )
+        filtered_contacts = await executor._apply_client_side_filters(
+            contacts, filters
+        )
 
         assert len(filtered_contacts) == 1
         assert filtered_contacts[0]["id"] == 1

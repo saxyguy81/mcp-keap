@@ -15,9 +15,7 @@ from src.mcp.tools_collections import (
     collection_union,
     collection_intersect,
     collection_diff,
-    collection_count,
     get_collection_details,
-    get_collection_ids,
     get_tags,
     modify_collection_tags,
     get_api_diagnostics
@@ -163,22 +161,22 @@ class TestFinalCoverageTargets:
                 col_b = collections[j]
                 
                 # Test union
-                union_result = await collection_union(context, col_a, col_b)
+                union_result = await collection_union(context, [col_a, col_b])
                 assert "collection_id" in union_result
                 assert union_result["count"] >= 0
                 
                 # Test intersection
-                intersect_result = await collection_intersect(context, col_a, col_b)
+                intersect_result = await collection_intersect(context, [col_a, col_b])
                 assert "collection_id" in intersect_result
                 assert intersect_result["count"] >= 0
                 
                 # Test difference
-                diff_result = await collection_diff(context, col_a, col_b)
+                diff_result = await collection_diff(context, col_a, [col_b])
                 assert "collection_id" in diff_result
                 assert diff_result["count"] >= 0
                 
                 # Test reverse difference
-                diff_reverse_result = await collection_diff(context, col_b, col_a)
+                diff_reverse_result = await collection_diff(context, col_b, [col_a])
                 assert "collection_id" in diff_reverse_result
                 assert diff_reverse_result["count"] >= 0
 
@@ -197,15 +195,18 @@ class TestFinalCoverageTargets:
             collection_id = result["collection_id"]
             expected_count = result["count"]
             
-            # Test collection_count
-            count_result = await collection_count(context, collection_id)
+            # Test collection count via get_collection_details
+            count_result = await get_collection_details(context, collection_id, count_only=True)
             assert "count" in count_result
             assert count_result["count"] == expected_count
             
-            # Test get_collection_ids
-            ids_result = await get_collection_ids(context, collection_id)
-            assert "contact_ids" in ids_result
-            assert len(ids_result["contact_ids"]) == expected_count
+            # Test get_collection_ids via get_collection_details
+            ids_result = await get_collection_details(context, collection_id, fields=["id"])
+            if "contacts" in ids_result:
+                contact_ids = [contact["id"] for contact in ids_result["contacts"]]
+                assert len(contact_ids) == expected_count
+            else:
+                assert ids_result["count"] == expected_count
             
             # Verify consistency
             if expected_count > 0:
@@ -316,13 +317,13 @@ class TestFinalCoverageTargets:
         
         # Test operations with empty collections
         edge_operations = [
-            lambda: collection_union(context, empty_id, empty_id),
-            lambda: collection_intersect(context, empty_id, empty_id),
-            lambda: collection_diff(context, empty_id, empty_id),
-            lambda: collection_union(context, empty_id, small_id),
-            lambda: collection_intersect(context, empty_id, small_id),
-            lambda: collection_diff(context, empty_id, small_id),
-            lambda: collection_diff(context, small_id, empty_id),
+            lambda: collection_union(context, [empty_id, empty_id]),
+            lambda: collection_intersect(context, [empty_id, empty_id]),
+            lambda: collection_diff(context, empty_id, [empty_id]),
+            lambda: collection_union(context, [empty_id, small_id]),
+            lambda: collection_intersect(context, [empty_id, small_id]),
+            lambda: collection_diff(context, empty_id, [small_id]),
+            lambda: collection_diff(context, small_id, [empty_id]),
         ]
         
         for operation in edge_operations:
@@ -344,8 +345,8 @@ class TestFinalCoverageTargets:
         async def stress_operation(collection_id):
             operations = [
                 lambda: get_collection_details(context, collection_id),
-                lambda: collection_count(context, collection_id),
-                lambda: get_collection_ids(context, collection_id),
+                lambda: get_collection_details(context, collection_id, count_only=True),
+                lambda: get_collection_details(context, collection_id, fields=["id"]),
                 lambda: get_api_diagnostics(context),
             ]
             

@@ -3,7 +3,7 @@ Advanced unit tests for optimization modules - covering missing functionality
 """
 
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, Mock
 
 from src.mcp.optimization.optimization import (
     QueryExecutor,
@@ -28,9 +28,9 @@ class TestQueryExecutorAdvanced:
 
     @pytest.fixture
     def mock_cache_manager(self):
-        cache = AsyncMock()
+        cache = Mock()
         cache.get.return_value = None  # Cache miss by default
-        cache.set = AsyncMock()
+        cache.set = Mock()
         return cache
 
 
@@ -41,10 +41,7 @@ class TestQueryExecutorAdvanced:
         """Test basic optimized query execution for contacts"""
         filters = [{"field": "email", "operator": "EQUALS", "value": "test@example.com"}]
         
-        # Set up cache miss
-        async def async_get(key):
-            return None
-        mock_cache_manager.get.side_effect = async_get
+        # Cache miss is already set in fixture
         
         # Set up API response with matching data
         mock_api_client.get_contacts.return_value = {
@@ -72,10 +69,7 @@ class TestQueryExecutorAdvanced:
         """Test optimized query for tags"""
         filters = [{"field": "name", "operator": "contains", "value": "VIP"}]
         
-        # Set up cache miss
-        async def async_get(key):
-            return None
-        mock_cache_manager.get.side_effect = async_get
+        # Cache miss is already set in fixture
         
         # Create query executor with mocked dependencies
         query_executor = QueryExecutor(mock_api_client, mock_cache_manager)
@@ -96,10 +90,7 @@ class TestQueryExecutorAdvanced:
         cached_data = [{"id": 1, "cached": True}]
         
         # Set up cache mock to return cached data
-        async def async_get(key):
-            return cached_data
-            
-        mock_cache_manager.get.side_effect = async_get
+        mock_cache_manager.get.return_value = cached_data
         
         # Create query executor with mocked dependencies
         query_executor = QueryExecutor(mock_api_client, mock_cache_manager)
@@ -144,12 +135,13 @@ class TestQueryOptimizerAdvanced:
         ]
 
         strategy = optimizer.analyze_query(filters)
-        assert strategy in ["server_optimized", "hybrid", "client_optimized"]
+        # Email filters trigger BULK_RETRIEVE strategy (see optimization logic)
+        assert strategy in ["server_optimized", "hybrid", "bulk_retrieve"]
 
     def test_analyze_query_empty_filters(self, optimizer):
         """Test query analysis with empty filters"""
         strategy = optimizer.analyze_query([])
-        assert strategy in ["server_optimized", "hybrid", "client_optimized", "bulk_retrieve"]
+        assert strategy in ["server_optimized", "hybrid", "bulk_retrieve"]
 
     def test_analyze_query_complex_filters(self, optimizer):
         """Test query analysis with complex filter types"""

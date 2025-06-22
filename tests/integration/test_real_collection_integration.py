@@ -17,9 +17,7 @@ from src.mcp.tools_collections import (
     collection_union,
     collection_intersect,
     collection_diff,
-    collection_count,
     get_collection_details,
-    get_collection_ids,
     get_tags,
     modify_collection_tags,
     get_api_diagnostics

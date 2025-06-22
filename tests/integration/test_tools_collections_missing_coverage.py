@@ -15,9 +15,7 @@ from src.mcp.tools_collections import (
     collection_union,
     collection_intersect,
     collection_diff,
-    collection_count,
     get_collection_details,
-    get_collection_ids,
     get_tags,
     modify_collection_tags,
     get_api_diagnostics
@@ -204,17 +202,17 @@ class TestMissingCoverageScenarios:
         collection_id_small = small_result["collection_id"]
         
         # Test self-operations (collection with itself)
-        self_union = await collection_union(context, collection_id_base, collection_id_base)
+        self_union = await collection_union(context, [collection_id_base, collection_id_base])
         assert self_union["count"] == base_result["count"]
         
-        self_intersect = await collection_intersect(context, collection_id_base, collection_id_base)
+        self_intersect = await collection_intersect(context, [collection_id_base, collection_id_base])
         assert self_intersect["count"] == base_result["count"]
         
-        self_diff = await collection_diff(context, collection_id_base, collection_id_base)
+        self_diff = await collection_diff(context, collection_id_base, [collection_id_base])
         assert self_diff["count"] == 0  # Should be empty (set - itself = empty)
         
         # Test operations with different sized collections
-        mixed_union = await collection_union(context, collection_id_base, collection_id_small)
+        mixed_union = await collection_union(context, [collection_id_base, collection_id_small])
         assert mixed_union["count"] >= max(base_result["count"], small_result["count"])
 
     @pytest.mark.asyncio
@@ -270,7 +268,7 @@ class TestMissingCoverageScenarios:
         
         try:
             # Invalid operation to generate error metrics
-            await collection_count(context, "invalid_collection_id")
+            await get_collection_details(context, "invalid_collection_id", count_only=True)
         except ValueError:
             pass  # Expected error
         
@@ -316,10 +314,10 @@ class TestMissingCoverageScenarios:
             return await get_collection_details(context, collection_id)
         
         async def get_count():
-            return await collection_count(context, collection_id)
+            return await get_collection_details(context, collection_id, count_only=True)
         
         async def get_ids():
-            return await get_collection_ids(context, collection_id)
+            return await get_collection_details(context, collection_id, fields=["id"])
         
         # Run operations concurrently
         tasks = [get_details(), get_count(), get_ids()] * 3  # 9 concurrent operations
@@ -331,7 +329,7 @@ class TestMissingCoverageScenarios:
         # Verify consistency across results
         details_results = [r for r in results if "contacts" in r]
         count_results = [r for r in results if "count" in r and "contacts" not in r]
-        ids_results = [r for r in results if "contact_ids" in r]
+        ids_results = [r for r in results if "contacts" in r and len(r.get("contacts", [])) > 0 and "id" in r["contacts"][0]]
         
         # All details results should have same count
         if details_results:
@@ -356,12 +354,12 @@ class TestMissingCoverageScenarios:
         error_operations = [
             # Invalid collection operations
             lambda: get_collection_details(context, "invalid_id"),
-            lambda: collection_count(context, "invalid_id"),
-            lambda: get_collection_ids(context, "invalid_id"),
+            lambda: get_collection_details(context, "invalid_id", count_only=True),
+            lambda: get_collection_details(context, "invalid_id", fields=["id"]),
             lambda: modify_collection_tags(context, "invalid_id", [1], "add"),
             # Invalid parameter operations
-            lambda: collection_union(context, valid_collection_id, "invalid_id"),
-            lambda: collection_intersect(context, "invalid_id", valid_collection_id),
+            lambda: collection_union(context, [valid_collection_id, "invalid_id"]),
+            lambda: collection_intersect(context, ["invalid_id", valid_collection_id]),
         ]
         
         # Run each error operation and verify system recovers

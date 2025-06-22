@@ -17,9 +17,7 @@ from src.mcp.tools_collections import (
     collection_union,
     collection_intersect,
     collection_diff,
-    collection_count,
-    get_collection_details,
-    get_collection_ids,
+    get_collection_details,  # Replaces collection_count and get_collection_ids
     get_tags,
     modify_collection_tags,
     get_api_diagnostics
@@ -71,17 +69,17 @@ class TestComprehensiveCollectionOperations:
         assert result2["count"] >= 0
         
         # Step 3: Test union operation
-        union_result = await collection_union(context, collection_id_1, collection_id_2)
+        union_result = await collection_union(context, [collection_id_1, collection_id_2])
         union_collection_id = union_result["collection_id"]
         assert union_result["count"] >= max(result1["count"], result2["count"])
         
         # Step 4: Test intersection operation
-        intersect_result = await collection_intersect(context, collection_id_1, collection_id_2)
+        intersect_result = await collection_intersect(context, [collection_id_1, collection_id_2])
         intersect_collection_id = intersect_result["collection_id"]
         assert intersect_result["count"] >= 0
         
         # Step 5: Test difference operation
-        diff_result = await collection_diff(context, collection_id_1, collection_id_2)
+        diff_result = await collection_diff(context, collection_id_1, [collection_id_2])
         diff_collection_id = diff_result["collection_id"]
         assert diff_result["count"] >= 0
         
@@ -102,11 +100,12 @@ class TestComprehensiveCollectionOperations:
         assert len(details["contacts"]) == union_count
         
         # Step 8: Test collection ID retrieval
-        ids = await get_collection_ids(context, union_collection_id)
-        assert len(ids["contact_ids"]) == union_count
+        ids_result = await get_collection_details(context, union_collection_id, fields=["id"])
+        ids = ids_result.get("contact_ids", [])
+        assert len(ids) == union_count
         
         # Step 9: Test collection counting
-        count_result = await collection_count(context, union_collection_id)
+        count_result = await get_collection_details(context, union_collection_id, count_only=True)
         assert count_result["count"] == union_count
 
     @pytest.mark.asyncio
@@ -212,7 +211,7 @@ class TestComprehensiveCollectionOperations:
         
         # Time the union operation
         start_time = time.time()
-        union_result = await collection_union(context, collection_id_1, collection_id_2)
+        union_result = await collection_union(context, [collection_id_1, collection_id_2])
         union_time = time.time() - start_time
         
         # Should complete efficiently
@@ -221,7 +220,7 @@ class TestComprehensiveCollectionOperations:
         
         # Test intersection timing
         start_time = time.time()
-        intersect_result = await collection_intersect(context, collection_id_1, collection_id_2)
+        intersect_result = await collection_intersect(context, [collection_id_1, collection_id_2])
         intersect_time = time.time() - start_time
         
         assert intersect_time < 2.0  # Should be faster than union
@@ -308,8 +307,8 @@ class TestErrorHandlingAndRecovery:
             ("collection_union", "invalid1", "invalid2"),
             ("collection_intersect", "invalid1", "invalid2"),
             ("collection_diff", "invalid1", "invalid2"),
-            ("collection_count", "invalid_collection_id"),
-            ("get_collection_ids", "invalid_collection_id")
+            ("get_collection_details_count", "invalid_collection_id"),
+            ("get_collection_details_ids", "invalid_collection_id")
         ]
         
         for scenario in error_scenarios:
@@ -320,15 +319,15 @@ class TestErrorHandlingAndRecovery:
                 if operation == "get_collection_details":
                     await get_collection_details(context, args[0])
                 elif operation == "collection_union":
-                    await collection_union(context, args[0], args[1])
+                    await collection_union(context, [args[0], args[1]])
                 elif operation == "collection_intersect":
-                    await collection_intersect(context, args[0], args[1])
+                    await collection_intersect(context, [args[0], args[1]])
                 elif operation == "collection_diff":
-                    await collection_diff(context, args[0], args[1])
-                elif operation == "collection_count":
-                    await collection_count(context, args[0])
-                elif operation == "get_collection_ids":
-                    await get_collection_ids(context, args[0])
+                    await collection_diff(context, args[0], [args[1]])
+                elif operation == "get_collection_details_count":
+                    await get_collection_details(context, args[0], count_only=True)
+                elif operation == "get_collection_details_ids":
+                    await get_collection_details(context, args[0], fields=["id"])
 
     @pytest.mark.asyncio
     async def test_recovery_after_errors(self, context, skip_if_no_api_key):
@@ -448,8 +447,8 @@ class TestDataConsistencyAndIntegrity:
         
         # Get data through different methods
         details_result = await get_collection_details(context, collection_id)
-        ids_result = await get_collection_ids(context, collection_id)
-        count_result = await collection_count(context, collection_id)
+        ids_result = await get_collection_details(context, collection_id, fields=["id"])
+        count_result = await get_collection_details(context, collection_id, count_only=True)
         
         # Verify consistency
         assert details_result["count"] == len(details_result["contacts"])
@@ -472,16 +471,16 @@ class TestDataConsistencyAndIntegrity:
             pytest.skip("No contacts available for immutability testing")
         
         # Get initial state
-        initial_ids = await get_collection_ids(context, collection_id)
-        initial_count = await collection_count(context, collection_id)
+        initial_ids = await get_collection_details(context, collection_id, fields=["id"])
+        initial_count = await get_collection_details(context, collection_id, count_only=True)
         
         # Perform operations that should not modify original
-        union_result = await collection_union(context, collection_id, collection_id)
-        intersect_result = await collection_intersect(context, collection_id, collection_id)
+        union_result = await collection_union(context, [collection_id, collection_id])
+        intersect_result = await collection_intersect(context, [collection_id, collection_id])
         
         # Verify original collection unchanged
-        final_ids = await get_collection_ids(context, collection_id)
-        final_count = await collection_count(context, collection_id)
+        final_ids = await get_collection_details(context, collection_id, fields=["id"])
+        final_count = await get_collection_details(context, collection_id, count_only=True)
         
         assert initial_ids["contact_ids"] == final_ids["contact_ids"]
         assert initial_count["count"] == final_count["count"]
