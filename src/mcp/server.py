@@ -31,7 +31,7 @@ class KeapMCPServer:
         self._register_resources()
 
     def _register_tools(self):
-        """Register collection-based MCP tools with proper decorators"""
+        """Register the 11 streamlined collection-based MCP tools"""
 
         # Core Contact Operations (2 tools)
         @self.mcp.tool()
@@ -74,87 +74,61 @@ class KeapMCPServer:
 
         # Collection Operations (4 tools)
         @self.mcp.tool()
-        async def collection_union(collection_a: str, collection_b: str):
-            """Combine two collections (A ∪ B).
+        async def collection_union(collection_names):
+            """Combine multiple collections (A ∪ B ∪ C...).
             
             Args:
-                collection_a: First collection ID
-                collection_b: Second collection ID
+                collection_names: List of collection IDs to combine
             """
             from src.mcp.tools_collections import collection_union as _union
             from mcp.server.fastmcp import Context
 
             context = Context()
-            return await _union(context, collection_a, collection_b)
+            return await _union(context, collection_names)
 
         @self.mcp.tool()
-        async def collection_intersect(collection_a: str, collection_b: str):
-            """Find contacts in both collections (A ∩ B).
+        async def collection_intersect(collection_names):
+            """Find contacts present in all collections (A ∩ B ∩ C...).
             
             Args:
-                collection_a: First collection ID
-                collection_b: Second collection ID
+                collection_names: List of collection IDs to intersect
             """
             from src.mcp.tools_collections import collection_intersect as _intersect
             from mcp.server.fastmcp import Context
 
             context = Context()
-            return await _intersect(context, collection_a, collection_b)
+            return await _intersect(context, collection_names)
 
         @self.mcp.tool()
-        async def collection_diff(collection_a: str, collection_b: str):
-            """Find contacts in first but not second collection (A - B).
+        async def collection_diff(base_collection: str, subtract_collections):
+            """Find contacts in base but not in any subtract collections (A - B - C...).
             
             Args:
-                collection_a: First collection ID
-                collection_b: Second collection ID
+                base_collection: Base collection ID
+                subtract_collections: List of collection IDs to subtract
             """
             from src.mcp.tools_collections import collection_diff as _diff
             from mcp.server.fastmcp import Context
 
             context = Context()
-            return await _diff(context, collection_a, collection_b)
+            return await _diff(context, base_collection, subtract_collections)
 
         @self.mcp.tool()
-        async def collection_count(collection_id: str):
-            """Get collection size without fetching data.
-            
-            Args:
-                collection_id: Collection identifier
-            """
-            from src.mcp.tools_collections import collection_count as _count
-            from mcp.server.fastmcp import Context
-
-            context = Context()
-            return await _count(context, collection_id)
-
-        # Collection Data Access (2 tools)
-        @self.mcp.tool()
-        async def get_collection_details(collection_id: str, fields=None):
+        async def get_collection_details(collection_id: str, fields=None, count_only=False):
             """Fetch contact data with field selection from collection.
             
+            This consolidated function replaces collection_count and get_collection_ids.
+            
             Args:
                 collection_id: Collection identifier
-                fields: List of fields to include (None for all fields)
+                fields: List of fields to include (None for all, ["id"] for IDs only)
+                count_only: If True, return only count information
             """
             from src.mcp.tools_collections import get_collection_details as _get_details
             from mcp.server.fastmcp import Context
 
             context = Context()
-            return await _get_details(context, collection_id, fields)
-
-        @self.mcp.tool()
-        async def get_collection_ids(collection_id: str):
-            """Get raw contact ID list from collection.
-            
-            Args:
-                collection_id: Collection identifier
-            """
-            from src.mcp.tools_collections import get_collection_ids as _get_ids
-            from mcp.server.fastmcp import Context
-
-            context = Context()
-            return await _get_ids(context, collection_id)
+            return await _get_details(context, collection_id, fields, count_only)
 
         # Tag Operations (2 tools)
         @self.mcp.tool()
@@ -172,7 +146,7 @@ class KeapMCPServer:
             return await _get_tags(context, category_id, limit)
 
         @self.mcp.tool()
-        async def apply_tags_to_collection(collection_id: str, tag_ids, operation: str = "add"):
+        async def modify_collection_tags(collection_id: str, tag_ids, operation: str = "add"):
             """Bulk tag operations on contact collections.
             
             Args:
@@ -180,11 +154,53 @@ class KeapMCPServer:
                 tag_ids: List of tag IDs to apply/remove
                 operation: "add" or "remove"
             """
-            from src.mcp.tools_collections import apply_tags_to_collection as _apply_tags
+            from src.mcp.tools_collections import modify_collection_tags as _modify_tags
             from mcp.server.fastmcp import Context
 
             context = Context()
-            return await _apply_tags(context, collection_id, tag_ids, operation)
+            return await _modify_tags(context, collection_id, tag_ids, operation)
+
+        # Field Management Operations (3 tools)
+        @self.mcp.tool()
+        async def get_collection_fields(collection_id: str, field_names):
+            """Get specific field values from all contacts in a collection.
+            
+            Args:
+                collection_id: Collection identifier
+                field_names: List of field names to retrieve
+            """
+            from src.mcp.tools_collections import get_collection_fields as _get_fields
+            from mcp.server.fastmcp import Context
+
+            context = Context()
+            return await _get_fields(context, collection_id, field_names)
+
+        @self.mcp.tool()
+        async def set_collection_fields(collection_id: str, field_updates):
+            """Set field values across all contacts in a collection.
+            
+            Args:
+                collection_id: Collection identifier
+                field_updates: Dict of field_name -> value pairs
+            """
+            from src.mcp.tools_collections import set_collection_fields as _set_fields
+            from mcp.server.fastmcp import Context
+
+            context = Context()
+            return await _set_fields(context, collection_id, field_updates)
+
+        @self.mcp.tool()
+        async def modify_contact_fields(contact_field_updates):
+            """Modify specific fields for specific contacts.
+            
+            Args:
+                contact_field_updates: Dict of contact_id -> {field_name -> value} mappings
+            """
+            from src.mcp.tools_collections import modify_contact_fields as _modify_fields
+            from mcp.server.fastmcp import Context
+
+            context = Context()
+            return await _modify_fields(context, contact_field_updates)
 
         # System Operations (1 tool)
         @self.mcp.tool()
