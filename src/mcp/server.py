@@ -114,6 +114,23 @@ class KeapMCPServer:
             return await _diff(context, base_collection, subtract_collections)
 
         @self.mcp.tool()
+        async def create_collection_from_ids(contact_ids, name=None):
+            """Create a collection from a list of contact IDs.
+            
+            This allows you to create collections from specific contact IDs,
+            then use other collection-based tools to operate on those contacts.
+            
+            Args:
+                contact_ids: List of contact IDs to include in collection
+                name: Optional name for the collection (auto-generated if not provided)
+            """
+            from src.mcp.tools_collections import create_collection_from_ids as _create_from_ids
+            from mcp.server.fastmcp import Context
+
+            context = Context()
+            return await _create_from_ids(context, contact_ids, name)
+
+        @self.mcp.tool()
         async def get_collection_details(collection_id: str, fields=None, count_only=False):
             """Fetch contact data with field selection from collection.
             
@@ -170,10 +187,8 @@ class KeapMCPServer:
                 field_names: List of field names to retrieve
             """
             from src.mcp.tools_collections import get_collection_fields as _get_fields
-            from mcp.server.fastmcp import Context
-
-            context = Context()
-            return await _get_fields(context, collection_id, field_names)
+            
+            return await _get_fields(collection_id, field_names)
 
         @self.mcp.tool()
         async def set_collection_fields(collection_id: str, field_updates):
@@ -184,23 +199,23 @@ class KeapMCPServer:
                 field_updates: Dict of field_name -> value pairs
             """
             from src.mcp.tools_collections import set_collection_fields as _set_fields
-            from mcp.server.fastmcp import Context
-
-            context = Context()
-            return await _set_fields(context, collection_id, field_updates)
+            
+            return await _set_fields(collection_id, field_updates)
 
         @self.mcp.tool()
-        async def modify_contact_fields(contact_field_updates):
-            """Modify specific fields for specific contacts.
+        async def modify_contact_fields(collection_id: str, field_name: str, contact_values):
+            """Modify specific field values for specific contacts in a collection.
             
             Args:
-                contact_field_updates: Dict of contact_id -> {field_name -> value} mappings
+                collection_id: Collection identifier
+                field_name: Name of the field to modify
+                contact_values: Dict of contact_id -> value mappings
             """
             from src.mcp.tools_collections import modify_contact_fields as _modify_fields
             from mcp.server.fastmcp import Context
 
             context = Context()
-            return await _modify_fields(context, contact_field_updates)
+            return await _modify_fields(context, collection_id, field_name, contact_values)
 
         # System Operations (1 tool)
         @self.mcp.tool()

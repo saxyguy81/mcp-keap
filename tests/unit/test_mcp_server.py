@@ -58,8 +58,8 @@ class TestCollectionBasedTools:
 
             KeapMCPServer()
 
-            # With the new collection-based architecture, we have 12 tools
-            expected_tool_count = 12
+            # With the new collection-based architecture, we have 13 tools
+            expected_tool_count = 13
             assert mock_mcp_instance.tool.call_count == expected_tool_count
 
             # Verify the mcp instance was properly set up

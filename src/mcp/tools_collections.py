@@ -229,6 +229,15 @@ async def _resolve_custom_field_names_in_filters(filters: List[Dict[str, Any]]) 
     resolved_filters = []
     
     for filter_item in filters:
+        # Ensure filter_item is a dictionary, not a string
+        if isinstance(filter_item, str):
+            logger.error(f"Invalid filter format: expected dict, got string '{filter_item}'. Filters must be dictionaries with 'field', 'operator', and 'value' keys.")
+            raise ValueError(f"Invalid filter format: expected dict, got string '{filter_item}'. Use format: {{'field': 'field_name', 'operator': 'equals', 'value': 'value'}}")
+        
+        if not isinstance(filter_item, dict):
+            logger.error(f"Invalid filter format: expected dict, got {type(filter_item).__name__}: {filter_item}")
+            raise ValueError(f"Invalid filter format: expected dict, got {type(filter_item).__name__}. Filters must be dictionaries.")
+        
         resolved_filter = filter_item.copy()
         
         # Check if using explicit field_id
@@ -456,6 +465,10 @@ async def list_contacts(
     collection_manager = get_collection_manager()
     
     try:
+        # Early validation of filter structure (before API calls)
+        if filters:
+            _validate_filter_structure(filters)
+        
         # Preprocess filters to resolve custom field names to IDs
         if filters:
             filters = await _resolve_custom_field_names_in_filters(filters)
@@ -758,6 +771,82 @@ async def collection_diff(
 #     """Get collection size without fetching data.
 #     DEPRECATED: Use get_collection_details(count_only=True) instead
 #     """
+
+
+# Collection Creation from Contact IDs
+async def create_collection_from_ids(
+    context: Context,
+    contact_ids: List[int],
+    name: Optional[str] = None
+) -> Dict[str, Any]:
+    """Create a collection from a list of contact IDs.
+    
+    This tool allows users to create collections from specific contact IDs,
+    then use other collection-based tools to operate on those contacts.
+    
+    Args:
+        context: MCP context
+        contact_ids: List of contact IDs to include in collection
+        name: Optional name for the collection (auto-generated if not provided)
+        
+    Returns:
+        Dict with collection_id and metadata
+        
+    Example:
+        # Create collection from specific contact IDs
+        result = await create_collection_from_ids(context, [123, 456, 789])
+        collection_id = result["collection_id"]
+        
+        # Then get details for all contacts in the collection
+        details = await get_collection_details(context, collection_id)
+    """
+    collection_manager = get_collection_manager()
+    
+    try:
+        # Validate input
+        if not contact_ids:
+            raise ValueError("contact_ids list cannot be empty")
+        
+        if not isinstance(contact_ids, list):
+            raise ValueError("contact_ids must be a list")
+        
+        # Convert to integers and validate
+        validated_ids = []
+        for contact_id in contact_ids:
+            try:
+                validated_ids.append(int(contact_id))
+            except (ValueError, TypeError):
+                raise ValueError(f"Invalid contact ID: {contact_id}. Contact IDs must be integers.")
+        
+        # Remove duplicates while preserving order
+        unique_ids = []
+        seen = set()
+        for contact_id in validated_ids:
+            if contact_id not in seen:
+                unique_ids.append(contact_id)
+                seen.add(contact_id)
+        
+        # Generate collection name if not provided
+        if name is None:
+            name = f"Custom collection ({len(unique_ids)} contacts)"
+        
+        # Create collection using collection manager
+        collection_id = collection_manager.create_collection(unique_ids, name)
+        
+        logger.info(f"Created collection {collection_id} with {len(unique_ids)} contacts")
+        
+        return {
+            "collection_id": collection_id,
+            "count": len(unique_ids),
+            "contact_ids": unique_ids,
+            "name": name,
+            "created_from": "contact_ids",
+            "operation": f"Created collection from {len(contact_ids)} contact IDs ({len(unique_ids)} unique)"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error creating collection from IDs: {e}")
+        raise
 
 
 # Collection Data Access
@@ -1385,6 +1474,39 @@ def _apply_filters(contacts: List[Dict], filters: List[Dict]) -> List[Dict]:
     return filtered_contacts
 
 
+def _validate_filter_structure(filters: List[Dict]) -> None:
+    """Validate filter structure early, before any API calls.
+    
+    Args:
+        filters: List of filter conditions to validate
+        
+    Raises:
+        ValueError: If filter conditions are malformed
+    """
+    if not isinstance(filters, list):
+        raise ValueError("Filters must be a list of filter objects")
+    
+    for i, filter_condition in enumerate(filters):
+        # Validate filter structure
+        if not isinstance(filter_condition, dict):
+            raise ValueError(f"Filter {i}: Must be a dictionary, got {type(filter_condition).__name__}")
+        
+        field = filter_condition.get("field")
+        operator = filter_condition.get("operator")
+        value = filter_condition.get("value")
+        
+        # Validate required fields
+        if field is None:
+            raise ValueError(f"Filter {i}: Missing required 'field' key. Filter must have 'field', 'operator', and 'value' keys.")
+        
+        if operator is None:
+            raise ValueError(f"Filter {i}: Missing required 'operator' key. Filter must have 'field', 'operator', and 'value' keys.")
+        
+        # Validate that value is provided for operators that require it
+        if operator not in ["is_null", "is_not_null"] and value is None:
+            raise ValueError(f"Filter {i}: Missing required 'value' key for operator '{operator}'. Only 'is_null' and 'is_not_null' operators can omit 'value'.")
+
+
 def _contact_matches_filters(contact: Dict, filters: List[Dict]) -> bool:
     """Check if a contact matches all filter conditions (AND logic).
     
@@ -1394,11 +1516,29 @@ def _contact_matches_filters(contact: Dict, filters: List[Dict]) -> bool:
         
     Returns:
         True if contact matches all filters
+        
+    Raises:
+        ValueError: If filter conditions are malformed
     """
-    for filter_condition in filters:
+    for i, filter_condition in enumerate(filters):
+        # Validate filter structure
+        if not isinstance(filter_condition, dict):
+            raise ValueError(f"Filter {i}: Must be a dictionary, got {type(filter_condition).__name__}")
+        
         field = filter_condition.get("field")
         operator = filter_condition.get("operator")
         value = filter_condition.get("value")
+        
+        # Validate required fields
+        if field is None:
+            raise ValueError(f"Filter {i}: Missing required 'field' key. Filter must have 'field', 'operator', and 'value' keys.")
+        
+        if operator is None:
+            raise ValueError(f"Filter {i}: Missing required 'operator' key. Filter must have 'field', 'operator', and 'value' keys.")
+        
+        # Validate that value is provided for operators that require it
+        if operator not in ["is_null", "is_not_null"] and value is None:
+            raise ValueError(f"Filter {i}: Missing required 'value' key for operator '{operator}'. Only 'is_null' and 'is_not_null' operators can omit 'value'.")
         
         if not _field_matches_condition(contact, field, operator, value):
             return False
@@ -1602,7 +1742,7 @@ async def get_collection_fields(
         contacts = []
         for contact_id in contact_ids:
             try:
-                contact_detail = await api_client.get_contact_details(str(contact_id))
+                contact_detail = await api_client.get_contact(str(contact_id))
                 contacts.append(contact_detail)
             except Exception as e:
                 logger.warning(f"Failed to get details for contact {contact_id}: {e}")
