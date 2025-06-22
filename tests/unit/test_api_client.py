@@ -319,7 +319,7 @@ class TestAPIEndpoints:
             result = await client.get_contacts(limit=50, offset=10)
 
             assert result == mock_data
-            mock_get.assert_called_once_with("/contacts", {"limit": 50, "offset": 10})
+            mock_get.assert_called_once_with("/contacts", {"limit": 50, "offset": 10, "optional_properties": "custom_fields,tag_ids"})
 
     @pytest.mark.asyncio
     async def test_get_contact(self):
@@ -334,7 +334,7 @@ class TestAPIEndpoints:
             result = await client.get_contact("123")
 
             assert result == mock_data
-            mock_get.assert_called_once_with("/contacts/123")
+            mock_get.assert_called_once_with("/contacts/123", {"optional_properties": "custom_fields,tag_ids"})
 
     @pytest.mark.asyncio
     async def test_create_contact(self):

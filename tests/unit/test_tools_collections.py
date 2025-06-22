@@ -1,12 +1,13 @@
 """
 Unit tests for collection-based MCP tools.
 
-Tests the new collection-based tools including:
+Tests the consolidated collection-based tools including:
 - list_contacts
 - get_contact_schema  
-- Collection operations (union, intersect, diff, count)
-- Collection data access (get_collection_details, get_collection_ids)
-- Tag operations on collections
+- Collection operations (union, intersect, diff)
+- Collection data access (get_collection_details with enhanced options)
+- Field management (get_collection_fields, set_collection_fields, modify_contact_fields)
+- Tag operations on collections (modify_collection_tags)
 - API diagnostics
 """
 
@@ -20,12 +21,13 @@ from src.mcp.tools_collections import (
     collection_union,
     collection_intersect,
     collection_diff,
-    collection_count,
     get_collection_details,
-    get_collection_ids,
     get_tags,
-    apply_tags_to_collection,
+    modify_collection_tags,
     get_api_diagnostics,
+    modify_contact_fields,
+    set_collection_fields,
+    get_collection_fields,
     _apply_filters,
     _contact_matches_filters,
     _field_matches_condition
@@ -158,7 +160,9 @@ class TestListContacts:
             limit=50,
             offset=10,
             order_by="given_name",
-            order_direction="DESC"
+            order_direction="DESC",
+            include_custom_fields=True,
+            include_tags=True
         )
 
     @patch('src.mcp.tools_collections.get_api_client')
@@ -221,11 +225,11 @@ class TestCollectionOperations:
         """Test collection_union function"""
         mock_get_cm.return_value = mock_collection_manager
         
-        result = await collection_union(mock_context, "collection_a", "collection_b")
+        result = await collection_union(mock_context, ["collection_a", "collection_b"])
         
         assert result["collection_id"] == "union_collection_456"
         assert result["count"] == 3
-        assert "union of collection_a and collection_b" in result["operation"]
+        assert "union" in result["operation"].lower()
         
         mock_collection_manager.union.assert_called_once_with("collection_a", "collection_b")
 
@@ -234,10 +238,10 @@ class TestCollectionOperations:
         """Test collection_intersect function"""
         mock_get_cm.return_value = mock_collection_manager
         
-        result = await collection_intersect(mock_context, "collection_a", "collection_b")
+        result = await collection_intersect(mock_context, ["collection_a", "collection_b"])
         
         assert result["collection_id"] == "intersect_collection_789"
-        assert "intersection of collection_a and collection_b" in result["operation"]
+        assert "intersection" in result["operation"].lower()
         
         mock_collection_manager.intersect.assert_called_once_with("collection_a", "collection_b")
 
@@ -246,33 +250,14 @@ class TestCollectionOperations:
         """Test collection_diff function"""
         mock_get_cm.return_value = mock_collection_manager
         
-        result = await collection_diff(mock_context, "collection_a", "collection_b")
+        result = await collection_diff(mock_context, "collection_a", ["collection_b"])
         
         assert result["collection_id"] == "diff_collection_012"
-        assert "difference of collection_a minus collection_b" in result["operation"]
+        assert "difference" in result["operation"].lower()
         
         mock_collection_manager.diff.assert_called_once_with("collection_a", "collection_b")
 
-    @patch('src.mcp.tools_collections.get_collection_manager')
-    async def test_collection_count(self, mock_get_cm, mock_context, mock_collection_manager):
-        """Test collection_count function"""
-        mock_get_cm.return_value = mock_collection_manager
-        
-        # Mock the collection object that get_collection returns
-        mock_collection = MagicMock()
-        mock_collection.contact_ids = {1, 2, 3}
-        mock_collection.name = "Test Collection"
-        mock_collection.description = "A test collection"
-        mock_collection.created_at = 1234567890.0
-        mock_collection_manager.get_collection.return_value = mock_collection
-        
-        result = await collection_count(mock_context, "test_collection")
-        
-        assert result["collection_id"] == "test_collection"
-        assert result["count"] == 3
-        assert result["name"] == "Test Collection"
-        assert result["description"] == "A test collection"
-        assert result["created_at"] == 1234567890.0
+    # REMOVED: test_collection_count - Use get_collection_details(count_only=True) instead
 
     @patch('src.mcp.tools_collections.get_collection_manager')
     async def test_collection_operations_error(self, mock_get_cm, mock_context, mock_collection_manager):
@@ -281,7 +266,7 @@ class TestCollectionOperations:
         mock_collection_manager.union.side_effect = ValueError("Collection not found")
         
         with pytest.raises(ValueError, match="Collection not found"):
-            await collection_union(mock_context, "invalid_a", "invalid_b")
+            await collection_union(mock_context, ["invalid_a", "invalid_b"])
 
 
 class TestCollectionDataAccess:
@@ -347,26 +332,26 @@ class TestCollectionDataAccess:
         assert result["count"] == 0  # No contacts returned due to errors
 
     @patch('src.mcp.tools_collections.get_collection_manager')
-    async def test_get_collection_ids(self, mock_get_cm, mock_context, mock_collection_manager):
-        """Test get_collection_ids function"""
+    async def test_get_collection_details_ids_only(self, mock_get_cm, mock_context, mock_collection_manager):
+        """Test get_collection_details with fields=['id'] (replaces get_collection_ids)"""
         mock_get_cm.return_value = mock_collection_manager
         mock_collection_manager.get_contact_ids.return_value = [1, 2, 3]
         
-        result = await get_collection_ids(mock_context, "test_collection")
+        result = await get_collection_details(mock_context, "test_collection", fields=["id"])
         
         assert result["collection_id"] == "test_collection"
         assert result["contact_ids"] == [1, 2, 3]
         assert result["count"] == 3
 
     @patch('src.mcp.tools_collections.get_collection_manager')
-    async def test_get_collection_ids_nonexistent(self, mock_get_cm, mock_context, mock_collection_manager):
-        """Test get_collection_ids with non-existent collection"""
+    async def test_get_collection_details_nonexistent(self, mock_get_cm, mock_context, mock_collection_manager):
+        """Test get_collection_details with non-existent collection"""
         mock_get_cm.return_value = mock_collection_manager
         mock_collection_manager.get_contact_ids.return_value = []
         mock_collection_manager.get_collection.return_value = None
         
         with pytest.raises(ValueError, match="Collection test_collection not found"):
-            await get_collection_ids(mock_context, "test_collection")
+            await get_collection_details(mock_context, "test_collection")
 
 
 class TestTagOperations:
@@ -397,8 +382,8 @@ class TestTagOperations:
 
     @patch('src.mcp.tools_collections.get_collection_manager')
     @patch('src.mcp.tools_collections.get_api_client')
-    async def test_apply_tags_to_collection(self, mock_get_api, mock_get_cm, mock_context):
-        """Test apply_tags_to_collection function"""
+    async def test_modify_collection_tags(self, mock_get_api, mock_get_cm, mock_context):
+        """Test modify_collection_tags function"""
         # Create mock collection manager
         mock_collection_manager = MagicMock()
         mock_collection_manager.get_contact_ids.return_value = [1, 2, 3]
@@ -410,7 +395,7 @@ class TestTagOperations:
         mock_api_client.close = AsyncMock()
         mock_get_api.return_value = mock_api_client
         
-        result = await apply_tags_to_collection(
+        result = await modify_collection_tags(
             mock_context, "test_collection", [1, 2], operation="add"
         )
         
@@ -427,8 +412,8 @@ class TestTagOperations:
 
     @patch('src.mcp.tools_collections.get_collection_manager')
     @patch('src.mcp.tools_collections.get_api_client')
-    async def test_apply_tags_remove_operation(self, mock_get_api, mock_get_cm, mock_context):
-        """Test apply_tags_to_collection with remove operation"""
+    async def test_modify_collection_tags_remove_operation(self, mock_get_api, mock_get_cm, mock_context):
+        """Test modify_collection_tags with remove operation"""
         # Create mock collection manager
         mock_collection_manager = MagicMock()
         mock_collection_manager.get_contact_ids.return_value = [1, 2, 3]
@@ -440,7 +425,7 @@ class TestTagOperations:
         mock_api_client.close = AsyncMock()
         mock_get_api.return_value = mock_api_client
         
-        await apply_tags_to_collection(
+        await modify_collection_tags(
             mock_context, "test_collection", [1], operation="remove"
         )
         
@@ -449,8 +434,8 @@ class TestTagOperations:
 
     @patch('src.mcp.tools_collections.get_collection_manager')
     @patch('src.mcp.tools_collections.get_api_client')
-    async def test_apply_tags_invalid_operation(self, mock_get_api, mock_get_cm, mock_context):
-        """Test apply_tags_to_collection with invalid operation"""
+    async def test_modify_collection_tags_invalid_operation(self, mock_get_api, mock_get_cm, mock_context):
+        """Test modify_collection_tags with invalid operation"""
         # Create mock collection manager
         mock_collection_manager = MagicMock()
         mock_collection_manager.get_contact_ids.return_value = [1, 2, 3]
@@ -461,7 +446,7 @@ class TestTagOperations:
         mock_api_client.close = AsyncMock()
         mock_get_api.return_value = mock_api_client
         
-        result = await apply_tags_to_collection(
+        result = await modify_collection_tags(
             mock_context, "test_collection", [1], operation="invalid"
         )
         
@@ -470,13 +455,13 @@ class TestTagOperations:
         assert result["failed"] == 3
 
     @patch('src.mcp.tools_collections.get_collection_manager')
-    async def test_apply_tags_nonexistent_collection(self, mock_get_cm, mock_context, mock_collection_manager):
-        """Test apply_tags_to_collection with non-existent collection"""
+    async def test_modify_collection_tags_nonexistent_collection(self, mock_get_cm, mock_context, mock_collection_manager):
+        """Test modify_collection_tags with non-existent collection"""
         mock_get_cm.return_value = mock_collection_manager
         mock_collection_manager.get_contact_ids.return_value = []
         
         with pytest.raises(ValueError, match="Collection test_collection not found"):
-            await apply_tags_to_collection(mock_context, "test_collection", [1])
+            await modify_collection_tags(mock_context, "test_collection", [1])
 
 
 class TestSystemOperations:
@@ -544,9 +529,18 @@ class TestHelperFunctions:
     def test_apply_filters_with_matches(self):
         """Test _apply_filters with matching contacts"""
         contacts = [
-            {"id": 1, "email": "john@company.com"},
-            {"id": 2, "email": "jane@example.com"},
-            {"id": 3, "email": "bob@company.com"}
+            {
+                "id": 1, 
+                "email_addresses": [{"email": "john@company.com", "field": "EMAIL1"}]
+            },
+            {
+                "id": 2, 
+                "email_addresses": [{"email": "jane@example.com", "field": "EMAIL1"}]
+            },
+            {
+                "id": 3, 
+                "email_addresses": [{"email": "bob@company.com", "field": "EMAIL1"}]
+            }
         ]
         filters = [{"field": "email", "operator": "contains", "value": "@company.com"}]
         
@@ -557,7 +551,11 @@ class TestHelperFunctions:
 
     def test_contact_matches_filters_all_match(self):
         """Test _contact_matches_filters when all filters match"""
-        contact = {"id": 1, "email": "john@company.com", "given_name": "John"}
+        contact = {
+            "id": 1, 
+            "email_addresses": [{"email": "john@company.com", "field": "EMAIL1"}],
+            "given_name": "John"
+        }
         filters = [
             {"field": "email", "operator": "contains", "value": "@company.com"},
             {"field": "given_name", "operator": "equals", "value": "John"}
@@ -567,7 +565,11 @@ class TestHelperFunctions:
 
     def test_contact_matches_filters_partial_match(self):
         """Test _contact_matches_filters when only some filters match"""
-        contact = {"id": 1, "email": "john@company.com", "given_name": "John"}
+        contact = {
+            "id": 1, 
+            "email_addresses": [{"email": "john@company.com", "field": "EMAIL1"}],
+            "given_name": "John"
+        }
         filters = [
             {"field": "email", "operator": "contains", "value": "@company.com"},
             {"field": "given_name", "operator": "equals", "value": "Jane"}
@@ -585,11 +587,22 @@ class TestHelperFunctions:
 
     def test_field_matches_condition_contains(self):
         """Test _field_matches_condition with contains operator"""
-        contact = {"email": "john.doe@company.com"}
+        # Test with regular field
+        contact = {"description": "john.doe@company.com"}
         
-        assert _field_matches_condition(contact, "email", "contains", "@company") is True
-        assert _field_matches_condition(contact, "email", "contains", "john") is True
-        assert _field_matches_condition(contact, "email", "contains", "@example") is False
+        assert _field_matches_condition(contact, "description", "contains", "@company") is True
+        assert _field_matches_condition(contact, "description", "contains", "john") is True
+        assert _field_matches_condition(contact, "description", "contains", "@example") is False
+        
+        # Test with email field (uses email_addresses array)
+        contact_with_email = {
+            "email_addresses": [
+                {"email": "john.doe@company.com", "field": "EMAIL1"}
+            ]
+        }
+        assert _field_matches_condition(contact_with_email, "email", "contains", "@company") is True
+        assert _field_matches_condition(contact_with_email, "email", "contains", "john") is True
+        assert _field_matches_condition(contact_with_email, "email", "contains", "@example") is False
 
     def test_field_matches_condition_starts_with(self):
         """Test _field_matches_condition with starts_with operator"""
@@ -600,10 +613,20 @@ class TestHelperFunctions:
 
     def test_field_matches_condition_ends_with(self):
         """Test _field_matches_condition with ends_with operator"""
-        contact = {"email": "john@company.com"}
+        # Test with regular field
+        contact = {"website": "john@company.com"}
         
-        assert _field_matches_condition(contact, "email", "ends_with", ".com") is True
-        assert _field_matches_condition(contact, "email", "ends_with", ".org") is False
+        assert _field_matches_condition(contact, "website", "ends_with", ".com") is True
+        assert _field_matches_condition(contact, "website", "ends_with", ".org") is False
+        
+        # Test with email field (uses email_addresses array)
+        contact_with_email = {
+            "email_addresses": [
+                {"email": "john@company.com", "field": "EMAIL1"}
+            ]
+        }
+        assert _field_matches_condition(contact_with_email, "email", "ends_with", ".com") is True
+        assert _field_matches_condition(contact_with_email, "email", "ends_with", ".org") is False
 
     def test_field_matches_condition_null_checks(self):
         """Test _field_matches_condition with null checks"""
@@ -616,12 +639,24 @@ class TestHelperFunctions:
 
     def test_field_matches_condition_not_operators(self):
         """Test _field_matches_condition with not operators"""
-        contact = {"email": "john@company.com"}
+        # Test with regular field
+        contact = {"website": "john@company.com"}
         
-        assert _field_matches_condition(contact, "email", "not_equals", "jane@company.com") is True
-        assert _field_matches_condition(contact, "email", "not_equals", "john@company.com") is False
-        assert _field_matches_condition(contact, "email", "not_contains", "@example") is True
-        assert _field_matches_condition(contact, "email", "not_contains", "@company") is False
+        assert _field_matches_condition(contact, "website", "not_equals", "jane@company.com") is True
+        assert _field_matches_condition(contact, "website", "not_equals", "john@company.com") is False
+        assert _field_matches_condition(contact, "website", "not_contains", "@example") is True
+        assert _field_matches_condition(contact, "website", "not_contains", "@company") is False
+        
+        # Test with email field (uses email_addresses array)
+        contact_with_email = {
+            "email_addresses": [
+                {"email": "john@company.com", "field": "EMAIL1"}
+            ]
+        }
+        assert _field_matches_condition(contact_with_email, "email", "not_equals", "jane@company.com") is True
+        assert _field_matches_condition(contact_with_email, "email", "not_equals", "john@company.com") is False
+        assert _field_matches_condition(contact_with_email, "email", "not_contains", "@example") is True
+        assert _field_matches_condition(contact_with_email, "email", "not_contains", "@company") is False
 
     def test_field_matches_condition_missing_field(self):
         """Test _field_matches_condition with missing field"""

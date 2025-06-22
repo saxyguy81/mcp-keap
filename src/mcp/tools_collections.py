@@ -8,6 +8,7 @@ including field management, tag operations, and optimization.
 
 import logging
 import json
+import asyncio
 from typing import Dict, List, Any, Optional, Union
 from datetime import datetime, timezone
 import time
@@ -44,6 +45,234 @@ READONLY_TAG_FIELDS = {
 
 
 # Helper functions for enhanced API
+def _normalize_email(email_str: str) -> str:
+    """Normalize email by removing prefixes and whitespace.
+    
+    Handles common email prefixes like mailto: and ensures consistent formatting.
+    
+    Args:
+        email_str: Raw email string
+        
+    Returns:
+        Normalized email address
+    """
+    if not email_str:
+        return email_str
+    
+    email = str(email_str).strip()
+    
+    # Remove common prefixes
+    prefixes_to_remove = ['mailto:', 'email:', 'Email:', 'MAILTO:']
+    for prefix in prefixes_to_remove:
+        if email.startswith(prefix):
+            email = email[len(prefix):].strip()
+            break
+    
+    return email
+
+
+def _extract_email(contact: Dict[str, Any]) -> Optional[str]:
+    """Extract primary email address from contact data.
+    
+    Keap API stores emails in email_addresses array, not direct email field.
+    Automatically handles mailto: prefix removal and email normalization.
+    
+    Args:
+        contact: Contact data from API
+        
+    Returns:
+        Primary email address or None if not found
+    """
+    # Method 1: email_addresses array (primary source)
+    if contact.get('email_addresses'):
+        email_addresses = contact['email_addresses']
+        if isinstance(email_addresses, list) and email_addresses:
+            for email_obj in email_addresses:
+                if isinstance(email_obj, dict) and email_obj.get('email'):
+                    email = _normalize_email(email_obj['email'])
+                    if email and '@' in email:  # Basic email validation
+                        return email
+    
+    # Method 2: Direct email field (fallback)
+    email = contact.get('email')
+    if email:
+        email = _normalize_email(email)
+        if email and '@' in email:  # Basic email validation
+            return email
+    
+    return None
+
+
+class CustomFieldManager:
+    """Manages custom field definitions and provides name-based access"""
+    
+    def __init__(self):
+        self.field_definitions: Dict[int, Dict[str, Any]] = {}
+        self.name_to_id_mapping: Dict[str, int] = {}
+        self.loaded = False
+        self._load_lock = asyncio.Lock() if hasattr(asyncio, 'Lock') else None
+    
+    async def load_field_definitions(self):
+        """Load custom field definitions from Keap API"""
+        if self.loaded:
+            return
+            
+        # Use lock to prevent concurrent loading
+        if self._load_lock:
+            async with self._load_lock:
+                if self.loaded:  # Double-check after acquiring lock
+                    return
+                await self._do_load_field_definitions()
+        else:
+            await self._do_load_field_definitions()
+    
+    async def _do_load_field_definitions(self):
+        """Actually load the field definitions"""
+        api_client = get_api_client()
+        
+        try:
+            # Try multiple endpoints to get field definitions
+            endpoints_to_try = ["/contacts/model", "/customFields"]
+            
+            for endpoint in endpoints_to_try:
+                try:
+                    response = await api_client.get(endpoint)
+                    
+                    # Parse custom fields from response
+                    custom_fields = []
+                    if 'custom_fields' in response:
+                        custom_fields = response['custom_fields']
+                    elif 'customFields' in response:
+                        custom_fields = response['customFields']
+                    elif isinstance(response, list):
+                        custom_fields = response
+                    
+                    if custom_fields:
+                        for field in custom_fields:
+                            if isinstance(field, dict) and 'id' in field:
+                                field_id = field['id']
+                                field_name = field.get('label', field.get('name', f'Field_{field_id}'))
+                                
+                                self.field_definitions[field_id] = {
+                                    'name': field_name,
+                                    'type': field.get('type', field.get('field_type', 'unknown')),
+                                    'definition': field
+                                }
+                                self.name_to_id_mapping[field_name] = field_id
+                        break
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to load fields from {endpoint}: {e}")
+                    continue
+            
+            # Add known important fields if not found
+            known_fields = {
+                239: "6FN Next Date/Time",
+                361: "6FN Next Date/Time END", 
+                363: "6FN Next Event Category A-B"
+            }
+            
+            for field_id, field_name in known_fields.items():
+                if field_id not in self.field_definitions:
+                    self.field_definitions[field_id] = {
+                        'name': field_name,
+                        'type': 'datetime' if 'Date/Time' in field_name else 'text',
+                        'definition': {'id': field_id, 'label': field_name}
+                    }
+                    self.name_to_id_mapping[field_name] = field_id
+            
+            self.loaded = True
+            logger.info(f"Loaded {len(self.field_definitions)} custom field definitions")
+            
+        except Exception as e:
+            logger.error(f"Failed to load field definitions: {e}")
+        finally:
+            await api_client.close()
+    
+    def get_field_name(self, field_id: int) -> str:
+        """Get field name from field ID"""
+        if field_id in self.field_definitions:
+            return self.field_definitions[field_id]['name']
+        return f"Field_{field_id}"
+    
+    def get_field_id(self, field_name: str) -> Optional[int]:
+        """Get field ID from field name"""
+        return self.name_to_id_mapping.get(field_name)
+    
+    def get_all_field_names(self) -> List[str]:
+        """Get all available field names"""
+        return list(self.name_to_id_mapping.keys())
+
+
+# Global field manager instance
+_global_field_manager: Optional[CustomFieldManager] = None
+
+
+def get_field_manager() -> CustomFieldManager:
+    """Get or create global custom field manager instance"""
+    global _global_field_manager
+    if _global_field_manager is None:
+        _global_field_manager = CustomFieldManager()
+    return _global_field_manager
+
+
+async def _resolve_custom_field_names_in_filters(filters: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Resolve custom field names to field IDs in filter list.
+    
+    New approach - field names are primary, field IDs are explicit:
+    - Use "field": "6FN Next Date/Time" for field names (preferred)
+    - Use "field_id": "custom_fields.239" for explicit field IDs
+    - Legacy "custom_fields.239" in "field" still supported but discouraged
+    """
+    field_manager = get_field_manager()
+    await field_manager.load_field_definitions()
+    
+    resolved_filters = []
+    
+    for filter_item in filters:
+        resolved_filter = filter_item.copy()
+        
+        # Check if using explicit field_id
+        if 'field_id' in filter_item:
+            field_id_spec = filter_item['field_id']
+            # field_id should be in format "custom_fields.123" or just "123"
+            if field_id_spec.startswith('custom_fields.'):
+                resolved_filter['field'] = field_id_spec
+            else:
+                resolved_filter['field'] = f"custom_fields.{field_id_spec}"
+            # Remove field_id from resolved filter
+            resolved_filter.pop('field_id', None)
+            logger.info(f"Using explicit field_id: {field_id_spec}")
+            
+        # Handle field name resolution
+        elif 'field' in filter_item:
+            field_name = filter_item['field']
+            
+            # Standard fields (email, given_name, etc.) - pass through unchanged
+            standard_fields = {'email', 'given_name', 'family_name', 'id', 'date_created', 'tags', 'phone', 'company'}
+            if field_name in standard_fields:
+                # Keep as-is for standard fields
+                pass
+            
+            # Legacy custom_fields.{id} format - keep for backward compatibility but warn
+            elif field_name.startswith('custom_fields.') and field_name[14:].isdigit():
+                logger.warning(f"Using legacy field ID format '{field_name}'. Consider using field names or explicit 'field_id' parameter.")
+                
+            # Try to resolve as custom field name
+            else:
+                field_id = field_manager.get_field_id(field_name)
+                if field_id:
+                    resolved_filter['field'] = f"custom_fields.{field_id}"
+                    logger.info(f"Resolved custom field '{field_name}' to 'custom_fields.{field_id}'")
+                else:
+                    # Not a known custom field, might be a standard field or typo
+                    logger.warning(f"Unknown field name '{field_name}'. Check spelling or use 'field_id' for custom fields.")
+        
+        resolved_filters.append(resolved_filter)
+    
+    return resolved_filters
+
+
 def _is_datetime_field(field_name: str) -> bool:
     """Check if a field is a datetime field requiring special handling."""
     return field_name in DATETIME_VALIDATION or field_name.endswith('_date') or field_name.endswith('_time')
@@ -212,13 +441,26 @@ async def list_contacts(
     Example filters:
         [{"field": "email", "operator": "contains", "value": "@company.com"}]
         [{"field": "given_name", "operator": "equals", "value": "John"}]
-        [{"field": "custom_field_7", "operator": "equals", "value": "VIP"}]
+        [{"field": "6FN Next Date/Time", "operator": "equals", "value": "2025-06-20T18:30:00.000+0000"}]
         [{"field": "tags", "operator": "contains", "value": "customer"}]
+        [{"field_id": "239", "operator": "equals", "value": "2025-06-20T18:30:00.000+0000"}]
+        
+    Field specification formats:
+        - Standard fields: Use "field": "email", "given_name", "tags", etc.
+        - Custom fields (preferred): Use "field": "6FN Next Date/Time" 
+        - Custom fields (explicit ID): Use "field_id": "239" or "field_id": "custom_fields.239"
+        - Legacy format: "field": "custom_fields.239" (discouraged, use field_id instead)
+        
+    Use get_contact_schema() to see all available field names.
     """
     api_client = get_api_client()
     collection_manager = get_collection_manager()
     
     try:
+        # Preprocess filters to resolve custom field names to IDs
+        if filters:
+            filters = await _resolve_custom_field_names_in_filters(filters)
+        
         # Handle edge case: limit=0 should return empty collection
         if limit == 0:
             contacts = []
@@ -239,20 +481,28 @@ async def list_contacts(
                 order_direction=order_direction,
             )
         else:
-            # Use direct API call for simple queries
-            contacts_data = await api_client.get_contacts(
-                limit=limit,
-                offset=offset,
-                order_by=order_by,
-                order_direction=order_direction,
-                include_custom_fields=True,
-                include_tags=True
-            )
-            
-            # Extract contacts and apply client-side filtering if needed
-            contacts = contacts_data.get("contacts", [])
+            # Use direct API call - enhanced to find contacts across the entire database
             if filters:
-                contacts = _apply_filters(contacts, filters)
+                # When filters are applied, search comprehensively to ensure we find matches
+                contacts = await _comprehensive_contact_search(
+                    api_client, filters, limit, offset, order_by, order_direction
+                )
+            else:
+                # Simple query without filters - use standard pagination
+                contacts_data = await api_client.get_contacts(
+                    limit=limit,
+                    offset=offset,
+                    order_by=order_by or "date_created",  # Default to newest first
+                    order_direction=order_direction or "DESC",
+                    include_custom_fields=True,
+                    include_tags=True
+                )
+                
+                contacts = contacts_data.get("contacts", [])
+                
+                # Apply email extraction to ensure consistency
+                for contact in contacts:
+                    contact['email'] = _extract_email(contact)
             
             metrics = None
         
@@ -315,9 +565,23 @@ async def get_contact_schema(context: Context) -> Dict[str, Any]:
             sample_contact = contacts[0]
             available_fields = list(sample_contact.keys())
         
-        # Get custom fields (this would need API support)
+        # Get custom field definitions using the field manager
+        field_manager = get_field_manager()
+        await field_manager.load_field_definitions()
+        
         custom_fields = []
-        # TODO: Implement custom field discovery via API
+        for field_name, field_id in field_manager.name_to_id_mapping.items():
+            field_def = field_manager.field_definitions.get(field_id, {})
+            custom_fields.append({
+                "name": field_name,
+                "id": field_id,
+                "type": field_def.get('type', 'unknown'),
+                "usage": {
+                    "preferred": f'"field": "{field_name}"',
+                    "explicit_id": f'"field_id": "{field_id}"',
+                    "legacy": f'"field": "custom_fields.{field_id}"'
+                }
+            })
         
         schema = {
             "standard_fields": available_fields,
@@ -341,6 +605,14 @@ async def get_contact_schema(context: Context) -> Dict[str, Any]:
                     "filter": {"field": "tags", "operator": "contains", "value": "VIP"}
                 },
                 {
+                    "description": "Find contacts by custom field (using field name - preferred)",
+                    "filter": {"field": "6FN Next Date/Time", "operator": "equals", "value": "2025-06-20T18:30:00.000+0000"}
+                },
+                {
+                    "description": "Find contacts by custom field (using explicit field ID)",
+                    "filter": {"field_id": "239", "operator": "equals", "value": "2025-06-20T18:30:00.000+0000"}
+                },
+                {
                     "description": "Multiple criteria (AND logic)",
                     "filters": [
                         {"field": "email", "operator": "contains", "value": "@company.com"},
@@ -362,29 +634,36 @@ async def get_contact_schema(context: Context) -> Dict[str, Any]:
 # Collection Operations
 async def collection_union(
     context: Context,
-    collection_a: str,
-    collection_b: str
+    collection_names: List[str]
 ) -> Dict[str, Any]:
-    """Combine two collections (A ∪ B).
+    """Combine multiple collections (A ∪ B ∪ C...).
     
     Args:
         context: MCP context
-        collection_a: First collection ID
-        collection_b: Second collection ID
+        collection_names: List of collection IDs to combine (minimum 2)
         
     Returns:
         Dict with new collection_id and count
     """
+    if len(collection_names) < 2:
+        raise ValueError("collection_union requires at least 2 collections")
+    
     collection_manager = get_collection_manager()
     
     try:
-        new_collection_id = collection_manager.union(collection_a, collection_b)
-        count = collection_manager.count(new_collection_id)
+        # Start with first two collections
+        result_collection_id = collection_manager.union(collection_names[0], collection_names[1])
+        
+        # Union with remaining collections
+        for collection_id in collection_names[2:]:
+            result_collection_id = collection_manager.union(result_collection_id, collection_id)
+        
+        count = collection_manager.count(result_collection_id)
         
         return {
-            "collection_id": new_collection_id,
+            "collection_id": result_collection_id,
             "count": count,
-            "operation": f"union of {collection_a} and {collection_b}"
+            "operation": f"union of {len(collection_names)} collections: {', '.join(collection_names)}"
         }
         
     except ValueError as e:
@@ -394,29 +673,36 @@ async def collection_union(
 
 async def collection_intersect(
     context: Context,
-    collection_a: str,
-    collection_b: str
+    collection_names: List[str]
 ) -> Dict[str, Any]:
-    """Find contacts in both collections (A ∩ B).
+    """Find contacts present in ALL collections (A ∩ B ∩ C...).
     
     Args:
         context: MCP context
-        collection_a: First collection ID
-        collection_b: Second collection ID
+        collection_names: List of collection IDs to intersect (minimum 2)
         
     Returns:
         Dict with new collection_id and count
     """
+    if len(collection_names) < 2:
+        raise ValueError("collection_intersect requires at least 2 collections")
+    
     collection_manager = get_collection_manager()
     
     try:
-        new_collection_id = collection_manager.intersect(collection_a, collection_b)
-        count = collection_manager.count(new_collection_id)
+        # Start with first two collections
+        result_collection_id = collection_manager.intersect(collection_names[0], collection_names[1])
+        
+        # Intersect with remaining collections
+        for collection_id in collection_names[2:]:
+            result_collection_id = collection_manager.intersect(result_collection_id, collection_id)
+        
+        count = collection_manager.count(result_collection_id)
         
         return {
-            "collection_id": new_collection_id,
+            "collection_id": result_collection_id,
             "count": count,
-            "operation": f"intersection of {collection_a} and {collection_b}"
+            "operation": f"intersection of {len(collection_names)} collections: {', '.join(collection_names)}"
         }
         
     except ValueError as e:
@@ -426,29 +712,38 @@ async def collection_intersect(
 
 async def collection_diff(
     context: Context,
-    collection_a: str,
-    collection_b: str
+    base_collection: str,
+    subtract_collections: List[str]
 ) -> Dict[str, Any]:
-    """Find contacts in first but not second collection (A - B).
+    """Find contacts in base collection but not in any of the subtract collections (A - B - C...).
     
     Args:
         context: MCP context
-        collection_a: First collection ID
-        collection_b: Second collection ID
+        base_collection: Base collection ID to start with
+        subtract_collections: List of collection IDs to subtract from base (minimum 1)
         
     Returns:
         Dict with new collection_id and count
     """
+    if len(subtract_collections) < 1:
+        raise ValueError("collection_diff requires at least 1 collection to subtract")
+    
     collection_manager = get_collection_manager()
     
     try:
-        new_collection_id = collection_manager.diff(collection_a, collection_b)
-        count = collection_manager.count(new_collection_id)
+        # Start with base collection minus first subtract collection
+        result_collection_id = collection_manager.diff(base_collection, subtract_collections[0])
+        
+        # Subtract remaining collections
+        for collection_id in subtract_collections[1:]:
+            result_collection_id = collection_manager.diff(result_collection_id, collection_id)
+        
+        count = collection_manager.count(result_collection_id)
         
         return {
-            "collection_id": new_collection_id,
+            "collection_id": result_collection_id,
             "count": count,
-            "operation": f"difference of {collection_a} minus {collection_b}"
+            "operation": f"difference: {base_collection} minus {len(subtract_collections)} collections: {', '.join(subtract_collections)}"
         }
         
     except ValueError as e:
@@ -456,32 +751,14 @@ async def collection_diff(
         raise
 
 
-async def collection_count(
-    context: Context,
-    collection_id: str
-) -> Dict[str, Any]:
-    """Get collection size without fetching data.
-    
-    Args:
-        context: MCP context
-        collection_id: Collection identifier
-        
-    Returns:
-        Dict with count information
-    """
-    collection_manager = get_collection_manager()
-    
-    collection = collection_manager.get_collection(collection_id)
-    if not collection:
-        raise ValueError(f"Collection {collection_id} not found or expired")
-    
-    return {
-        "collection_id": collection_id,
-        "count": len(collection.contact_ids),
-        "name": collection.name,
-        "description": collection.description,
-        "created_at": collection.created_at
-    }
+# REMOVED: collection_count - Use get_collection_details(count_only=True) instead
+# async def collection_count(
+#     context: Context,
+#     collection_id: str
+# ) -> Dict[str, Any]:
+#     """Get collection size without fetching data.
+#     DEPRECATED: Use get_collection_details(count_only=True) instead
+#     """
 
 
 # Collection Data Access
@@ -490,29 +767,60 @@ async def get_collection_details(
     collection_id: str,
     fields: Optional[List[str]] = None,
     limit: Optional[int] = None,
+    count_only: bool = False,
     enable_optimization: bool = True,
     return_metrics: bool = False
 ) -> Dict[str, Any]:
-    """Fetch contact data with field selection from collection.
+    """Fetch contact data with field selection from collection, or just count.
     
     Args:
         context: MCP context
         collection_id: Collection identifier
-        fields: List of fields to include (None for all fields)
+        fields: List of fields to include (None for all fields, ["id"] for IDs only)
         limit: Maximum number of contacts to return (None for all)
+        count_only: If True, return only count information (replaces collection_count)
         enable_optimization: Use optimization engine for bulk operations
         return_metrics: Include performance metrics in response
         
     Returns:
-        Dict with contact details and optional metrics
+        Dict with contact details/count and optional metrics
     """
     collection_manager = get_collection_manager()
     api_client = get_api_client()
     
     try:
-        contact_ids = collection_manager.get_contact_ids(collection_id)
-        if not contact_ids:
+        # First check if collection exists, then get contact IDs
+        collection = collection_manager.get_collection(collection_id)
+        if not collection:
             raise ValueError(f"Collection {collection_id} not found or expired")
+        
+        contact_ids = collection_manager.get_contact_ids(collection_id)
+        # Now contact_ids can be empty (valid for 0-contact collections)
+        
+        # If count_only is requested, return just count information
+        if count_only:
+            result = {
+                "collection_id": collection_id,
+                "count": len(contact_ids),
+                "name": collection.name,
+                "description": collection.description,
+                "created_at": collection.created_at
+            }
+            if return_metrics:
+                result["metrics"] = {"duration_ms": 0, "api_calls_made": 0}
+            return result
+        
+        # Handle fields=["id"] case for getting just contact IDs
+        if fields == ["id"]:
+            limited_contact_ids = contact_ids[:limit] if limit is not None and limit > 0 else contact_ids
+            result = {
+                "collection_id": collection_id,
+                "count": len(limited_contact_ids),
+                "contact_ids": limited_contact_ids
+            }
+            if return_metrics:
+                result["metrics"] = {"duration_ms": 0, "api_calls_made": 0}
+            return result
         
         # Apply limit if specified
         if limit is not None and limit > 0:
@@ -566,9 +874,15 @@ async def get_collection_details(
                     )
                     api_calls_made += 1
                     
+                    # Add extracted email to contact data
+                    contact['email'] = _extract_email(contact)
+                    
                     # Apply field filtering if specified
                     if fields:
                         filtered_contact = {field: contact.get(field) for field in fields if field in contact}
+                        # Always include extracted email if email was requested
+                        if 'email' in fields:
+                            filtered_contact['email'] = contact['email']
                         contacts.append(filtered_contact)
                     else:
                         contacts.append(contact)
@@ -598,9 +912,15 @@ async def get_collection_details(
                 for contact in batch_contacts:
                     contact_id = contact["id"]
                     if contact_id in target_ids and contact_id not in found_ids:
+                        # Add extracted email to contact data
+                        contact['email'] = _extract_email(contact)
+                        
                         # Apply field filtering if specified
                         if fields:
                             filtered_contact = {field: contact.get(field) for field in fields if field in contact}
+                            # Always include extracted email if email was requested
+                            if 'email' in fields:
+                                filtered_contact['email'] = contact['email']
                             contacts.append(filtered_contact)
                         else:
                             contacts.append(contact)
@@ -655,30 +975,14 @@ async def get_collection_details(
         await api_client.close()
 
 
-async def get_collection_ids(
-    context: Context,
-    collection_id: str
-) -> Dict[str, Any]:
-    """Get raw contact ID list from collection.
-    
-    Args:
-        context: MCP context
-        collection_id: Collection identifier
-        
-    Returns:
-        Dict with contact ID list
-    """
-    collection_manager = get_collection_manager()
-    
-    contact_ids = collection_manager.get_contact_ids(collection_id)
-    if not contact_ids and not collection_manager.get_collection(collection_id):
-        raise ValueError(f"Collection {collection_id} not found or expired")
-    
-    return {
-        "collection_id": collection_id,
-        "contact_ids": contact_ids,
-        "count": len(contact_ids)
-    }
+# REMOVED: get_collection_ids - Use get_collection_details(fields=["id"]) instead
+# async def get_collection_ids(
+#     context: Context,
+#     collection_id: str
+# ) -> Dict[str, Any]:
+#     """Get raw contact ID list from collection.
+#     DEPRECATED: Use get_collection_details(fields=["id"]) instead
+#     """
 
 
 # Tag Operations
@@ -686,7 +990,7 @@ async def get_tags(
     context: Context,
     category_id: Optional[int] = None,
     limit: int = 200
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """List available tags with optional filtering.
     
     Args:
@@ -695,18 +999,19 @@ async def get_tags(
         limit: Maximum number of tags
         
     Returns:
-        List of tag information
+        Dict with tags list and pagination info
     """
     api_client = get_api_client()
     
     try:
-        tags = await api_client.get_tags(limit=limit)
+        result = await api_client.get_tags(limit=limit)
         
         # Filter by category if specified
-        if category_id is not None:
-            tags = [tag for tag in tags if tag.get("category_id") == category_id]
+        if category_id is not None and "tags" in result:
+            filtered_tags = [tag for tag in result["tags"] if tag.get("category_id") == category_id]
+            result = {**result, "tags": filtered_tags, "count": len(filtered_tags)}
         
-        return tags
+        return result
         
     except Exception as e:
         logger.error(f"Error in get_tags: {e}")
@@ -715,7 +1020,7 @@ async def get_tags(
         await api_client.close()
 
 
-async def apply_tags_to_collection(
+async def modify_collection_tags(
     context: Context,
     collection_id: str,
     tag_ids: List[int],
@@ -932,6 +1237,133 @@ async def get_api_diagnostics(context: Context) -> Dict[str, Any]:
         raise
 
 
+async def _comprehensive_contact_search(
+    api_client, 
+    filters: List[Dict], 
+    limit: int, 
+    offset: int = 0,
+    order_by: Optional[str] = None,
+    order_direction: str = "DESC"
+) -> List[Dict]:
+    """Comprehensive contact search that finds matches across the entire database.
+    
+    This function addresses the issue where newer contacts (like smhanan) weren't 
+    being found due to pagination limitations. It searches in multiple passes
+    to ensure we find matches even if they're in newer/different parts of the database.
+    
+    Args:
+        api_client: Keap API client
+        filters: List of filter conditions
+        limit: Maximum contacts to return
+        offset: Starting offset for search
+        order_by: Field to order by
+        order_direction: Sort direction
+        
+    Returns:
+        List of matching contacts
+    """
+    logger.info(f"Starting comprehensive search with {len(filters)} filters, limit={limit}")
+    
+    matching_contacts = []
+    searched_contact_ids = set()
+    
+    # Strategy 1: Search newest contacts first (where smhanan contacts are)
+    logger.info("Strategy 1: Searching newest contacts first")
+    newest_batch_size = min(500, limit * 3)  # Search more than requested to find matches
+    
+    newest_data = await api_client.get_contacts(
+        limit=newest_batch_size,
+        offset=0,
+        order_by="date_created",
+        order_direction="DESC",  # Newest first
+        include_custom_fields=True,
+        include_tags=True
+    )
+    
+    newest_contacts = newest_data.get("contacts", [])
+    logger.info(f"Retrieved {len(newest_contacts)} newest contacts")
+    
+    # Apply email extraction and filtering to newest contacts
+    for contact in newest_contacts:
+        contact['email'] = _extract_email(contact)
+        if _contact_matches_filters(contact, filters):
+            if contact['id'] not in searched_contact_ids:
+                matching_contacts.append(contact)
+                searched_contact_ids.add(contact['id'])
+                
+                if len(matching_contacts) >= limit:
+                    logger.info(f"Found {len(matching_contacts)} matches in newest contacts")
+                    return matching_contacts[:limit]
+    
+    logger.info(f"Found {len(matching_contacts)} matches in newest contacts, searching more...")
+    
+    # Strategy 2: If we need more matches, search with standard pagination from offset
+    if len(matching_contacts) < limit and offset > 0:
+        logger.info(f"Strategy 2: Searching from offset {offset}")
+        
+        standard_data = await api_client.get_contacts(
+            limit=limit * 2,  # Get more to account for filtering
+            offset=offset,
+            order_by=order_by or "date_created",
+            order_direction=order_direction,
+            include_custom_fields=True,
+            include_tags=True
+        )
+        
+        standard_contacts = standard_data.get("contacts", [])
+        logger.info(f"Retrieved {len(standard_contacts)} contacts from offset {offset}")
+        
+        for contact in standard_contacts:
+            contact['email'] = _extract_email(contact)
+            if _contact_matches_filters(contact, filters):
+                if contact['id'] not in searched_contact_ids:
+                    matching_contacts.append(contact)
+                    searched_contact_ids.add(contact['id'])
+                    
+                    if len(matching_contacts) >= limit:
+                        break
+    
+    # Strategy 3: If still need more matches, do additional batched search
+    if len(matching_contacts) < limit:
+        logger.info(f"Strategy 3: Additional batched search (current matches: {len(matching_contacts)})")
+        
+        # Search in batches across different parts of the database
+        additional_batch_size = 200
+        max_additional_batches = 5  # Limit to prevent excessive API calls
+        
+        for batch_num in range(max_additional_batches):
+            batch_offset = newest_batch_size + (batch_num * additional_batch_size)
+            
+            batch_data = await api_client.get_contacts(
+                limit=additional_batch_size,
+                offset=batch_offset,
+                order_by="date_created",
+                order_direction="DESC",
+                include_custom_fields=True,
+                include_tags=True
+            )
+            
+            batch_contacts = batch_data.get("contacts", [])
+            if not batch_contacts:
+                break  # No more contacts
+            
+            logger.info(f"Batch {batch_num + 1}: Retrieved {len(batch_contacts)} contacts from offset {batch_offset}")
+            
+            for contact in batch_contacts:
+                contact['email'] = _extract_email(contact)
+                if _contact_matches_filters(contact, filters):
+                    if contact['id'] not in searched_contact_ids:
+                        matching_contacts.append(contact)
+                        searched_contact_ids.add(contact['id'])
+                        
+                        if len(matching_contacts) >= limit:
+                            logger.info(f"Found {len(matching_contacts)} total matches")
+                            return matching_contacts[:limit]
+    
+    logger.info(f"Comprehensive search complete: {len(matching_contacts)} matches found")
+    return matching_contacts[:limit]
+
+
 # Helper functions
 def _apply_filters(contacts: List[Dict], filters: List[Dict]) -> List[Dict]:
     """Apply client-side filters to contact list.
@@ -978,6 +1410,9 @@ def _contact_matches_filters(contact: Dict, filters: List[Dict]) -> bool:
 def _field_matches_condition(contact: Dict, field: str, operator: str, value: Any) -> bool:
     """Check if a field matches a specific condition.
     
+    Special handling for email field: searches through email_addresses array
+    since the standard 'email' field on contacts is never used.
+    
     Args:
         contact: Contact dictionary
         field: Field name to check
@@ -987,6 +1422,10 @@ def _field_matches_condition(contact: Dict, field: str, operator: str, value: An
     Returns:
         True if field matches condition
     """
+    # Special handling for email field - search email_addresses array
+    if field == "email":
+        return _email_matches_condition(contact, operator, value)
+    
     contact_value = contact.get(field)
     
     if contact_value is None:
@@ -1037,8 +1476,96 @@ def _field_matches_condition(contact: Dict, field: str, operator: str, value: An
     return False
 
 
+def _email_matches_condition(contact: Dict, operator: str, value: Any) -> bool:
+    """Check if any email in the email_addresses array matches the condition.
+    
+    Since the standard 'email' field on contacts is never used, we need to
+    search through the email_addresses array for any matching emails.
+    
+    Args:
+        contact: Contact dictionary
+        operator: Comparison operator
+        value: Value to compare against
+        
+    Returns:
+        True if any email matches the condition
+    """
+    email_addresses = contact.get('email_addresses', [])
+    
+    # Handle null checks first
+    if operator == "is_null":
+        return not email_addresses or all(
+            not email_obj.get('email') for email_obj in email_addresses if isinstance(email_obj, dict)
+        )
+    elif operator == "is_not_null":
+        return any(
+            email_obj.get('email') for email_obj in email_addresses if isinstance(email_obj, dict)
+        )
+    
+    # If no emails, return False for all other operators
+    if not email_addresses:
+        return operator in ["not_equals", "not_contains", "not_in"]
+    
+    # Extract and normalize all emails
+    emails = []
+    for email_obj in email_addresses:
+        if isinstance(email_obj, dict) and email_obj.get('email'):
+            normalized_email = _normalize_email(email_obj['email'])
+            if normalized_email and '@' in normalized_email:
+                emails.append(normalized_email)
+    
+    # If no valid emails found, return False for most operators
+    if not emails:
+        return operator in ["not_equals", "not_contains", "not_in"]
+    
+    # Check condition against all emails
+    search_value = str(value).lower() if value is not None else ""
+    
+    for email in emails:
+        email_lower = email.lower()
+        
+        if operator == "equals":
+            if email_lower == search_value:
+                return True
+        elif operator == "not_equals":
+            # For not_equals, ALL emails must not equal the value
+            if email_lower == search_value:
+                return False
+        elif operator == "contains":
+            if search_value in email_lower:
+                return True
+        elif operator == "not_contains":
+            # For not_contains, ALL emails must not contain the value
+            if search_value in email_lower:
+                return False
+        elif operator == "starts_with":
+            if email_lower.startswith(search_value):
+                return True
+        elif operator == "ends_with":
+            if email_lower.endswith(search_value):
+                return True
+        elif operator == "in":
+            if isinstance(value, (list, tuple)):
+                search_values = [str(v).lower() for v in value]
+                if email_lower in search_values:
+                    return True
+        elif operator == "not_in":
+            if isinstance(value, (list, tuple)):
+                search_values = [str(v).lower() for v in value]
+                # For not_in, ALL emails must not be in the list
+                if email_lower in search_values:
+                    return False
+    
+    # Handle negative operators that require ALL emails to not match
+    if operator in ["not_equals", "not_contains", "not_in"]:
+        return True
+    
+    # For all other operators, no email matched
+    return False
+
+
 # Enhanced Field Management Functions
-async def get_fields_for_collection(
+async def get_collection_fields(
     collection_id: str,
     fields: List[str],
     limit: Optional[int] = None,
@@ -1136,7 +1663,7 @@ async def get_fields_for_collection(
         await api_client.close()
 
 
-async def set_fields_for_collection(
+async def set_collection_fields(
     collection_id: str,
     field_updates: Dict[str, Any],
     validate_types: bool = True,
@@ -1253,7 +1780,8 @@ async def set_fields_for_collection(
         await api_client.close()
 
 
-async def set_field_for_contacts(
+async def modify_contact_fields(
+    context: Context,
     collection_id: str,
     field_name: str,
     contact_values: Dict[str, Any],
@@ -1262,9 +1790,13 @@ async def set_field_for_contacts(
 ) -> Dict[str, Any]:
     """Set different field values for specific contacts in collection.
     
+    Automatically handles both standard fields (given_name, family_name, email) 
+    and custom fields (using field names like "6FN Next Date/Time").
+    
     Args:
+        context: MCP context
         collection_id: Collection identifier
-        field_name: Single field to update
+        field_name: Field to update (standard or custom field name)
         contact_values: Dict of contact_id -> value (e.g., {"contact_123": "VIP", "contact_456": None})
         validate_types: Perform type checking
         return_metrics: Include performance metrics
@@ -1372,27 +1904,25 @@ async def set_field_for_contacts(
         await api_client.close()
 
 
+# REMOVED: Duplicate modify_collection_tags function - Use the one at line 1019 instead
 # Enhanced Tag Management Functions  
-async def modify_collection_tags(
-    collection_id: str,
-    tag_ids: List[int],
-    operation: str = "add",
-    return_metrics: bool = False
-) -> Dict[str, Any]:
-    """Modify tags for all contacts in collection with flexible operations.
-    
-    Args:
-        collection_id: Collection identifier
-        tag_ids: List of tag IDs to apply/remove
-        operation: "add" (append), "remove" (remove), "replace" (set exact tags)
-        return_metrics: Include performance metrics
-        
-    Returns:
-        Dict with operation results and optional metrics
-    """
-    # Implement tag modification directly without context dependency
-    collection_manager = get_collection_manager()
-    api_client = get_api_client()
+# async def modify_collection_tags(
+#     collection_id: str,
+#     tag_ids: List[int],
+#     operation: str = "add",
+#     return_metrics: bool = False
+# ) -> Dict[str, Any]:
+#     """Modify tags for all contacts in collection with flexible operations.
+#     
+#     Args:
+#         collection_id: Collection identifier
+#         tag_ids: List of tag IDs to apply/remove
+#         operation: "add" (append), "remove" (remove), "replace" (set exact tags)
+#         return_metrics: Include performance metrics
+#         
+#     Returns:
+#         Dict with operation results and optional metrics
+#     """
     
     try:
         start_time = time.time()
@@ -1802,9 +2332,15 @@ async def delete_tags(
         # Delete tags
         for tag_id in tag_ids:
             try:
-                await api_client.delete_tag(str(tag_id))
+                deletion_result = await api_client.delete_tag(str(tag_id))
                 api_calls_made += 1
-                deleted_tags.append(tag_id)
+                
+                # Handle both old and new response formats
+                if isinstance(deletion_result, dict) and "id" in deletion_result:
+                    deleted_tags.append(deletion_result)
+                else:
+                    # Fallback for older response format
+                    deleted_tags.append({"id": tag_id, "deleted": True})
                 
             except Exception as e:
                 logger.warning(f"Failed to delete tag {tag_id}: {e}")
@@ -1893,7 +2429,7 @@ def get_api_client():
 
 
 # Context-dependent wrapper functions for MCP tools
-async def get_fields_for_collection_mcp(
+async def get_collection_fields_mcp(
     context: Context,
     collection_id: str,
     fields: List[str],
@@ -1902,13 +2438,13 @@ async def get_fields_for_collection_mcp(
     timezone: Optional[str] = None,
     return_metrics: bool = False
 ) -> Dict[str, Any]:
-    """MCP wrapper for get_fields_for_collection."""
-    return await get_fields_for_collection(
+    """MCP wrapper for get_collection_fields."""
+    return await get_collection_fields(
         collection_id, fields, limit, return_raw_json, timezone, return_metrics
     )
 
 
-async def set_fields_for_collection_mcp(
+async def set_collection_fields_mcp(
     context: Context,
     collection_id: str,
     field_updates: Dict[str, Any],
@@ -1916,13 +2452,13 @@ async def set_fields_for_collection_mcp(
     require_timezone_for_datetime: bool = True,
     return_metrics: bool = False
 ) -> Dict[str, Any]:
-    """MCP wrapper for set_fields_for_collection."""
-    return await set_fields_for_collection(
+    """MCP wrapper for set_collection_fields."""
+    return await set_collection_fields(
         collection_id, field_updates, validate_types, require_timezone_for_datetime, return_metrics
     )
 
 
-async def set_field_for_contacts_mcp(
+async def modify_contact_fields_mcp(
     context: Context,
     collection_id: str,
     field_name: str,
@@ -1930,9 +2466,9 @@ async def set_field_for_contacts_mcp(
     validate_types: bool = True,
     return_metrics: bool = False
 ) -> Dict[str, Any]:
-    """MCP wrapper for set_field_for_contacts."""
-    return await set_field_for_contacts(
-        collection_id, field_name, contact_values, validate_types, return_metrics
+    """MCP wrapper for modify_contact_fields."""
+    return await modify_contact_fields(
+        context, collection_id, field_name, contact_values, validate_types, return_metrics
     )
 
 
@@ -1985,3 +2521,78 @@ async def delete_tags_mcp(
 ) -> Dict[str, Any]:
     """MCP wrapper for delete_tags."""
     return await delete_tags(tag_ids, return_usage_info, return_metrics)
+
+
+# REMOVED: Single-contact custom field operations - Use set_field_for_contacts instead
+# Enhanced Custom Field Operations
+# async def update_contact_custom_field_by_name(
+#     context: Context, 
+#     contact_id: str, 
+#     field_name: str, 
+#     value: Any
+# ) -> Dict[str, Any]:
+#     """Update a contact's custom field using field name instead of field ID.
+#     DEPRECATED: Use set_field_for_contacts with single contact instead
+#     """
+#     field_manager = get_field_manager()
+#     await field_manager.load_field_definitions()
+#     
+#     field_id = field_manager.get_field_id(field_name)
+#     if not field_id:
+#         available_names = field_manager.get_all_field_names()
+#         raise ValueError(f"Custom field '{field_name}' not found. Available fields: {available_names[:10]}...")
+#     
+#     api_client = get_api_client()
+#     try:
+#         result = await api_client.update_contact_custom_field(str(contact_id), str(field_id), value)
+#         
+#         # Return result with field name for clarity 
+#         result['field_name'] = field_name
+#         result['field_id'] = field_id
+#         result['field_value'] = value
+#         return result
+#         
+#     finally:
+#         await api_client.close()
+
+
+# REMOVED: get_contact_custom_fields_by_name - Use get_collection_details instead
+# async def get_contact_custom_fields_by_name(
+#     context: Context, 
+#     contact_id: str
+# ) -> Dict[str, Any]:
+#     """Get a contact's custom fields with field names instead of just IDs.
+#     DEPRECATED: Use get_collection_details with custom fields instead
+#     """
+#     field_manager = get_field_manager()
+#     await field_manager.load_field_definitions()
+#     
+#     api_client = get_api_client()
+#     try:
+#         contact = await api_client.get_contact(str(contact_id), include_custom_fields=True)
+#         custom_fields = contact.get('custom_fields', [])
+#         
+#         # Convert field IDs to names
+#         named_fields = {}
+#         for field in custom_fields:
+#             if isinstance(field, dict) and 'id' in field:
+#                 field_id = field['id']
+#                 field_name = field_manager.get_field_name(field_id)
+#                 field_content = field.get('content')
+#                 
+#                 named_fields[field_name] = {
+#                     'value': field_content,
+#                     'field_id': field_id,
+#                     'type': field_manager.field_definitions.get(field_id, {}).get('type', 'unknown')
+#                 }
+#         
+#         return {
+#             'contact_id': contact_id,
+#             'custom_fields_by_name': named_fields,
+#             'total_fields': len(named_fields)
+#         }
+#         
+#     finally:
+#         await api_client.close()
+
+

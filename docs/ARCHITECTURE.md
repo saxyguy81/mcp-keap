@@ -1,33 +1,40 @@
-# Keap MCP Simplified Architecture
+# Keap MCP Collection-Based Architecture
 
 ## Overview
 
-The Keap MCP (Model Context Protocol) service provides a streamlined, production-ready interface for interacting with the Keap CRM API. The architecture emphasizes simplicity, reliability, and maintainability.
+The Keap MCP (Model Context Protocol) service provides a streamlined, production-ready interface for interacting with the Keap CRM API using a **collection-based architecture** with **field name-first interface**. The architecture emphasizes performance, usability, and maintainability.
 
 ## Architecture Principles
 
-### 1. Simplicity-First Design
-- **Direct Implementation**: Minimal abstraction layers for better maintainability
-- **Clear Responsibilities**: Each module has a well-defined, focused purpose
+### 1. Collection-Based Design
+- **Collection Operations**: Work with logical groups of contacts using collection IDs
+- **Set Operations**: Union, intersection, and difference operations on collections
+- **Lazy Evaluation**: Operations on collections don't fetch data until explicitly requested
+- **Field Name-First**: Use human-readable field names instead of field IDs
 - **Async Operations**: All API interactions use async/await patterns
-- **Pragmatic Caching**: Simple SQLite-based persistent caching
+- **Persistent Caching**: SQLite-based collection and contact caching
 
-### 2. Simplified Architecture
+### 2. Collection-Based Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    MCP Server Layer                        │
-│              (server.py + tools.py)                        │
+│              (server.py + 11 streamlined tools)            │
 └─────────────────────────────────────────────────────────────┘
                                 │
 ┌─────────────────────────────────────────────────────────────┐
-│                  MCP Tools Layer                          │
-│      contact_tools.py │ tag_tools.py │ optimization/       │
+│                Collection Tools Layer                      │
+│  tools_collections.py │ CustomFieldManager │ Schema Discovery│
+└─────────────────────────────────────────────────────────────┘
+                                │
+┌─────────────────────────────────────────────────────────────┐
+│              Collection Management Layer                   │
+│   Collection Manager │ Set Operations │ TTL Management     │
 └─────────────────────────────────────────────────────────────┘
                                 │
 ┌─────────────────────────────────────────────────────────────┐
 │                Infrastructure Layer                        │
-│    API Client │ Cache Manager │ Schemas │ Utils            │
+│    API Client │ Cache Manager │ Field Resolution │ Utils   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -41,13 +48,14 @@ The Keap MCP (Model Context Protocol) service provides a streamlined, production
 - Request routing and response handling
 - Error handling and logging
 
-### MCP Tools (`src/mcp/tools.py`)
-**Tool Interface Layer**
+### Collection Tools (`src/mcp/tools_collections.py`)
+**Collection-Based Tool Interface**
 
-- Unified interface for all 17 MCP tools
+- Unified interface for all 11 streamlined MCP tools
+- Field name-first interface with CustomFieldManager
+- Collection-based operations with lazy evaluation
 - Context management for shared components
-- Tool parameter validation and processing
-- Integration with contact and tag tools
+- Automatic field name resolution to field IDs
 - Optimization engine integration
 
 **Available Tools:**

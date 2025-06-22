@@ -80,22 +80,24 @@ class TestCollectionBasedTools:
                 # Core Contact Operations (2 tools)
                 "list_contacts",
                 "get_contact_schema",
-                # Collection Operations (4 tools)
+                # Collection Operations (3 tools)
                 "collection_union",
                 "collection_intersect", 
                 "collection_diff",
-                "collection_count",
-                # Collection Data Access (2 tools)
+                # Collection Data Access (1 enhanced tool)
                 "get_collection_details",
-                "get_collection_ids",
+                # Field Management (3 tools)
+                "get_collection_fields",
+                "set_collection_fields",
+                "modify_contact_fields",
                 # Tag Operations (2 tools)
                 "get_tags",
-                "apply_tags_to_collection",
+                "modify_collection_tags",
                 # System Operations (1 tool)
                 "get_api_diagnostics",
             ]
 
-            assert len(tools) == 11
+            assert len(tools) == 12
             assert tools == expected_tools
 
     def test_list_tools_with_get_tools_method(self):

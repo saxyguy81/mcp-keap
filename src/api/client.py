@@ -529,16 +529,111 @@ class KeapApiService:
         """Create a new tag"""
         return await self.post("/tags", tag_data)
 
+    async def delete_tag(self, tag_id: str) -> Dict[str, Any]:
+        """Delete a tag from the system.
+        
+        Args:
+            tag_id: The ID of the tag to delete
+            
+        Returns:
+            Dict with deletion status
+            
+        Note:
+            Tag deletion may require specific API permissions or scopes.
+            If this fails with 405 Method Not Allowed, it indicates either:
+            1. The API token lacks required permissions
+            2. The account type doesn't support tag deletion via API
+            3. The endpoint has been deprecated/changed
+        """
+        try:
+            # Try v1 API first (DELETE /tags/{tagId})
+            result = await self.delete(f"/tags/{tag_id}")
+            return {"id": int(tag_id), "deleted": True, "api_version": "v1"}
+        except Exception as v1_error:
+            if "405" in str(v1_error) or "Method Not Allowed" in str(v1_error):
+                # Try v2 API if available
+                try:
+                    if self.api_version == "v2":
+                        result = await self.delete(f"/tags/{tag_id}")
+                    else:
+                        # Try v2 API with explicit URL
+                        v2_url = self.base_url.replace("/v1", "/v2")
+                        original_session_base = self.session.base_url
+                        
+                        # Create temporary session with v2 base URL
+                        try:
+                            self.session.base_url = v2_url
+                            result = await self.delete(f"/tags/{tag_id}")
+                        finally:
+                            # Restore original base URL
+                            self.session.base_url = original_session_base
+                    
+                    # v2 API returns 204 No Content, so create a success response
+                    return {"id": int(tag_id), "deleted": True, "api_version": "v2"}
+                    
+                except Exception as v2_error:
+                    # Both v1 and v2 failed
+                    raise RuntimeError(
+                        f"Tag deletion failed on both API versions. "
+                        f"V1 error: {v1_error}. V2 error: {v2_error}. "
+                        f"This may indicate insufficient permissions or unsupported operation."
+                    ) from v1_error
+            else:
+                # Re-raise non-405 errors
+                raise
+
     async def apply_tag_to_contact(
         self, contact_id: str, tag_id: str
     ) -> Dict[str, Any]:
-        """Apply a tag to a contact"""
+        """Apply a tag to a contact with multiple API format attempts"""
         if self.api_version == "v2":
             # Use v2 batch endpoint if available
             return await self.apply_tags_to_contacts([tag_id], [contact_id])
         else:
-            # Use v1 individual endpoint
-            return await self.post(f"/contacts/{contact_id}/tags", {"tagId": tag_id})
+            # Use v1 individual endpoint - try multiple payload formats
+            tag_id_int = int(tag_id)
+            
+            # Format 1: Direct PUT to tags endpoint (most reliable)
+            try:
+                response = await self._make_request("PUT", f"/contacts/{contact_id}/tags/{tag_id_int}")
+                return {"contact_id": contact_id, "tag_id": tag_id_int, "applied": True, "method": "PUT"}
+            except Exception as e1:
+                logger.debug(f"PUT method failed: {e1}")
+            
+            # Format 2: POST with tagIds array (common batch format)
+            try:
+                response = await self.post(f"/contacts/{contact_id}/tags", {"tagIds": [tag_id_int]})
+                return {"contact_id": contact_id, "tag_id": tag_id_int, "applied": True, "method": "POST_tagIds"}
+            except Exception as e2:
+                logger.debug(f"POST tagIds method failed: {e2}")
+            
+            # Format 3: POST with simple tag_id
+            try:
+                response = await self.post(f"/contacts/{contact_id}/tags", {"tag_id": tag_id_int})
+                return {"contact_id": contact_id, "tag_id": tag_id_int, "applied": True, "method": "POST_tag_id"}
+            except Exception as e3:
+                logger.debug(f"POST tag_id method failed: {e3}")
+            
+            # Format 4: POST with id field
+            try:
+                response = await self.post(f"/contacts/{contact_id}/tags", {"id": tag_id_int})
+                return {"contact_id": contact_id, "tag_id": tag_id_int, "applied": True, "method": "POST_id"}
+            except Exception as e4:
+                logger.debug(f"POST id method failed: {e4}")
+            
+            # Format 5: POST to specific tag endpoint (direct assignment)
+            try:
+                response = await self.post(f"/contacts/{contact_id}/tags/{tag_id_int}", {})
+                return {"contact_id": contact_id, "tag_id": tag_id_int, "applied": True, "method": "POST_direct"}
+            except Exception as e5:
+                logger.debug(f"POST direct method failed: {e5}")
+            
+            # If all methods fail, raise the most informative error
+            raise RuntimeError(
+                f"Failed to apply tag {tag_id} to contact {contact_id}. "
+                f"All API formats attempted. Last errors: PUT: {e1}, POST_tagIds: {e2}, "
+                f"POST_tag_id: {e3}, POST_id: {e4}, POST_direct: {e5}"
+            )
 
     async def remove_tag_from_contact(
         self, contact_id: str, tag_id: str

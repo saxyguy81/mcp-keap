@@ -91,6 +91,18 @@ class QueryOptimizer:
         if not filters:
             return QueryStrategy.BULK_RETRIEVE
 
+        # Check for email filters - always use BULK_RETRIEVE for proper email_addresses handling
+        email_filters = [f for f in filters if f.get("field") == "email"]
+        if email_filters:
+            logger.debug("Email filters detected - using BULK_RETRIEVE for comprehensive email_addresses search")
+            return QueryStrategy.BULK_RETRIEVE
+
+        # Check for custom field filters - always use BULK_RETRIEVE for client-side processing
+        custom_field_filters = [f for f in filters if f.get("field", "").startswith("custom_fields.")]
+        if custom_field_filters:
+            logger.debug("Custom field filters detected - using BULK_RETRIEVE for client-side processing")
+            return QueryStrategy.BULK_RETRIEVE
+
         # Check for tag-based filters
         tag_filters = [
             f for f in filters if f.get("field") in ["tags", "tag_id", "tag_ids"]
@@ -112,16 +124,29 @@ class QueryOptimizer:
         return QueryStrategy.HYBRID
 
     def _count_server_optimizable_filters(self, filters: List[Dict[str, Any]]) -> int:
-        """Count filters that can be optimized server-side."""
-        server_fields = {"email", "given_name", "family_name", "id", "date_created"}
+        """Count filters that can be optimized server-side.
+        
+        Note: Email filters are NOT server-optimizable because emails are stored
+        in email_addresses array, not the direct email field.
+        """
+        # Email is removed from server_fields because it requires client-side processing
+        server_fields = {"given_name", "family_name", "id", "date_created"}
         server_operators = {"EQUALS", "CONTAINS", "equals", "contains"}
 
         count = 0
         for filter_condition in filters:
-            if (
-                filter_condition.get("field") in server_fields
-                and filter_condition.get("operator") in server_operators
-            ):
+            field = filter_condition.get("field", "")
+            operator = filter_condition.get("operator", "")
+            
+            # Email filters always require client-side processing
+            if field == "email":
+                continue
+            
+            # Custom fields require client-side processing
+            if field.startswith("custom_fields."):
+                continue
+            
+            if field in server_fields and operator in server_operators:
                 count += 1
 
         return count
@@ -446,25 +471,113 @@ class QueryExecutor:
         **kwargs,
     ) -> Tuple[List[Dict[str, Any]], int, int, int]:
         """Execute with bulk retrieval and client-side filtering."""
-        from src.utils.filter_utils import apply_complex_filters
+        from src.mcp.tools_collections import _extract_email, _contact_matches_filters
 
-        # Get all data and filter client-side
         if query_type == "list_contacts":
-            params = {"limit": limit, "offset": offset}
-            response = await self.api_client.get_contacts(**params)
-            results = response.get("contacts", [])
+            # Enhanced contact retrieval to ensure we don't miss contacts
+            results = await self._comprehensive_optimization_search(
+                filters, limit, offset, **kwargs
+            )
+            api_calls = 2  # Estimate for multiple searches
         else:
             results = []
+            api_calls = 1
 
-        # Apply all filters client-side
-        if filters:
-            results = apply_complex_filters(results, filters)
-
-        api_calls = 1
         server_filters = 0
         client_filters_count = len(filters)
 
         return results, api_calls, server_filters, client_filters_count
+
+    async def _comprehensive_optimization_search(
+        self,
+        filters: List[Dict[str, Any]], 
+        limit: int, 
+        offset: int = 0,
+        **kwargs
+    ) -> List[Dict[str, Any]]:
+        """Comprehensive search for optimization engine to ensure no contacts are missed.
+        
+        This addresses the issue where newer contacts weren't being found due to 
+        limited search scope in the optimization engine.
+        """
+        # Import here to avoid circular imports
+        from src.mcp.tools_collections import _extract_email, _contact_matches_filters
+        
+        matching_contacts = []
+        searched_contact_ids = set()
+        
+        # Search strategy: Get a larger sample from different parts of the database
+        search_batch_size = max(500, limit * 3)  # Search more than requested
+        
+        # First pass: Get contacts from the beginning (newest)
+        response1 = await self.api_client.get_contacts(
+            limit=search_batch_size,
+            offset=0,
+            include_custom_fields=True,
+            include_tags=True
+        )
+        contacts1 = response1.get("contacts", [])
+        
+        # Apply email extraction and filtering
+        for contact in contacts1:
+            contact['email'] = _extract_email(contact)
+            if _contact_matches_filters(contact, filters):
+                if contact['id'] not in searched_contact_ids:
+                    matching_contacts.append(contact)
+                    searched_contact_ids.add(contact['id'])
+                    
+                    if len(matching_contacts) >= limit:
+                        return matching_contacts[:limit]
+        
+        # Second pass: Get contacts from the offset position if specified
+        if offset > 0 and len(matching_contacts) < limit:
+            response2 = await self.api_client.get_contacts(
+                limit=search_batch_size,
+                offset=offset,
+                include_custom_fields=True,
+                include_tags=True
+            )
+            contacts2 = response2.get("contacts", [])
+            
+            for contact in contacts2:
+                contact['email'] = _extract_email(contact)
+                if _contact_matches_filters(contact, filters):
+                    if contact['id'] not in searched_contact_ids:
+                        matching_contacts.append(contact)
+                        searched_contact_ids.add(contact['id'])
+                        
+                        if len(matching_contacts) >= limit:
+                            return matching_contacts[:limit]
+        
+        # Third pass: If still need more matches, search additional batches
+        if len(matching_contacts) < limit:
+            additional_batches = 3  # Search a few more batches
+            
+            for batch_num in range(additional_batches):
+                batch_offset = search_batch_size + (batch_num * 200)
+                
+                response_batch = await self.api_client.get_contacts(
+                    limit=200,
+                    offset=batch_offset,
+                    include_custom_fields=True,
+                    include_tags=True
+                )
+                contacts_batch = response_batch.get("contacts", [])
+                
+                if not contacts_batch:
+                    break  # No more contacts
+                
+                for contact in contacts_batch:
+                    contact['email'] = _extract_email(contact)
+                    if _contact_matches_filters(contact, filters):
+                        if contact['id'] not in searched_contact_ids:
+                            matching_contacts.append(contact)
+                            searched_contact_ids.add(contact['id'])
+                            
+                            if len(matching_contacts) >= limit:
+                                return matching_contacts[:limit]
+        
+        return matching_contacts[:limit]
 
     def _generate_cache_key(
         self,

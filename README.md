@@ -16,10 +16,11 @@ A high-performance Model Context Protocol (MCP) server for interacting with Keap
 - **Composable Workflows** - Chain operations together for complex contact management tasks
 
 ### Core Contact & Tag Management
-- **Universal Contact Search** - Single powerful search tool with comprehensive filtering options
-- **Schema Discovery** - Runtime discovery of available fields, custom fields, and filter operators
+- **Universal Contact Search** - Single powerful search tool with field name-based filtering
+- **Schema Discovery** - Runtime discovery of available fields, custom fields, and preferred usage patterns
+- **Field Name-First Interface** - Use human-readable field names instead of field IDs
 - **Advanced Tag Operations** - Tag lifecycle management and bulk operations on collections
-- **Custom Field Operations** - Query and bulk update custom fields across contact collections
+- **Custom Field Operations** - Query and bulk update custom fields using field names across contact collections
 - **Complex Logical Filtering** - Support for AND, OR, NOT operators with nested conditions
 
 ### Performance & Optimization
@@ -51,8 +52,8 @@ The Keap MCP Server uses a collection-based, high-performance architecture:
 The server exposes **11 streamlined MCP tools** using a collection-based architecture:
 
 ### Core Contact Operations (2 tools)
-1. **`list_contacts`** - Universal search with comprehensive filters, returns collection ID
-2. **`get_contact_schema`** - Get available fields, custom fields, and filter examples
+1. **`list_contacts`** - Universal search with field name-based filters, returns collection ID
+2. **`get_contact_schema`** - Get available fields, custom fields, and usage patterns
 
 ### Collection Operations (4 tools)  
 3. **`collection_union`** - Combine two collections (A ∪ B)
@@ -265,12 +266,22 @@ python -m pytest tests/integration/ -v
   }
 }
 
-// Custom field search
+// Custom field search (using field names - preferred)
 {
   "function": "list_contacts",
   "params": {
     "filters": [
-      { "field": "custom_field_7", "operator": "equals", "value": "VIP" }
+      { "field": "6FN Next Date/Time", "operator": "equals", "value": "2025-06-20T18:30:00.000+0000" }
+    ]
+  }
+}
+
+// Custom field search (using explicit field ID - alternative)
+{
+  "function": "list_contacts",
+  "params": {
+    "filters": [
+      { "field_id": "239", "operator": "equals", "value": "2025-06-20T18:30:00.000+0000" }
     ]
   }
 }
@@ -282,7 +293,7 @@ python -m pytest tests/integration/ -v
     "filters": [
       { "field": "email", "operator": "contains", "value": "@company.com" },
       { "field": "tags", "operator": "contains", "value": "customer" },
-      { "field": "date_created", "operator": "after", "value": "2024-01-01" }
+      { "field": "Member Expire Date", "operator": "after", "value": "2024-01-01" }
     ]
   }
 }
@@ -295,7 +306,11 @@ python -m pytest tests/integration/ -v
   "function": "get_contact_schema",
   "params": {}
 }
-// Returns: available fields, custom fields, operators, and examples
+// Returns: 
+// - Available standard fields
+// - Custom fields with names, IDs, and types
+// - Usage patterns (preferred field name format, explicit field_id format, legacy format)
+// - Supported operators and filter examples
 ```
 
 ### Collection Set Operations
