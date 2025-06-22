@@ -459,8 +459,21 @@ class KeapApiService:
     async def update_contact(
         self, contact_id: str, contact_data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Update an existing contact"""
-        return await self.put(f"/contacts/{contact_id}", contact_data)
+        """Update an existing contact using PATCH method (Keap API standard)"""
+        try:
+            # Use PATCH method for partial contact updates (Keap API standard)
+            return await self.patch(f"/contacts/{contact_id}", contact_data)
+        except Exception as e:
+            # If PATCH fails with 405, try PUT as fallback
+            if "405" in str(e) or "Method Not Allowed" in str(e):
+                logger.warning(f"PATCH method not allowed for contact update, trying PUT fallback: {e}")
+                try:
+                    return await self.put(f"/contacts/{contact_id}", contact_data)
+                except Exception as put_error:
+                    logger.error(f"Both PATCH and PUT methods failed for contact update: {put_error}")
+                    raise put_error
+            else:
+                raise e
 
     async def update_contact_custom_field(
         self, contact_id: str, field_id: str, value: Any
