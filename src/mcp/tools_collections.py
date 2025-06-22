@@ -73,8 +73,12 @@ def _normalize_email(email_str: str) -> str:
 def _extract_email(contact: Dict[str, Any]) -> Optional[str]:
     """Extract primary email address from contact data.
     
-    Keap API stores emails in email_addresses array, not direct email field.
-    Automatically handles mailto: prefix removal and email normalization.
+    IMPORTANT: Keap API has architectural inconsistencies where:
+    - email field can be null while email_addresses array has data
+    - email_addresses is the authoritative source for email data
+    - Server-side filtering on email field is incomplete and unreliable
+    
+    This function handles both scenarios to ensure no emails are missed.
     
     Args:
         contact: Contact data from API
@@ -82,7 +86,7 @@ def _extract_email(contact: Dict[str, Any]) -> Optional[str]:
     Returns:
         Primary email address or None if not found
     """
-    # Method 1: email_addresses array (primary source)
+    # Method 1: email_addresses array (PRIMARY and most reliable source)
     if contact.get('email_addresses'):
         email_addresses = contact['email_addresses']
         if isinstance(email_addresses, list) and email_addresses:
@@ -92,7 +96,8 @@ def _extract_email(contact: Dict[str, Any]) -> Optional[str]:
                     if email and '@' in email:  # Basic email validation
                         return email
     
-    # Method 2: Direct email field (fallback)
+    # Method 2: Direct email field (fallback for legacy/simple cases)
+    # NOTE: This field can be null even when email_addresses has data
     email = contact.get('email')
     if email:
         email = _normalize_email(email)
@@ -100,6 +105,102 @@ def _extract_email(contact: Dict[str, Any]) -> Optional[str]:
             return email
     
     return None
+
+
+def _extract_all_emails(contact: Dict[str, Any]) -> List[str]:
+    """Extract ALL email addresses from contact data.
+    
+    IMPORTANT: For comprehensive email filtering, we need to check ALL email sources:
+    - email_addresses array (can contain multiple emails)
+    - email field (fallback/primary field)
+    - email2, email3 fields (additional email fields mentioned in research)
+    
+    This ensures no emails are missed during filtering operations.
+    
+    Args:
+        contact: Contact data from API
+        
+    Returns:
+        List of all valid email addresses found for this contact
+    """
+    emails = []
+    
+    # Method 1: email_addresses array (PRIMARY source - can have multiple emails)
+    if contact.get('email_addresses'):
+        email_addresses = contact['email_addresses']
+        if isinstance(email_addresses, list):
+            for email_obj in email_addresses:
+                if isinstance(email_obj, dict) and email_obj.get('email'):
+                    email = _normalize_email(email_obj['email'])
+                    if email and '@' in email and email not in emails:
+                        emails.append(email)
+    
+    # Method 2: Primary email field (can be null even when email_addresses has data)
+    email = contact.get('email')
+    if email:
+        email = _normalize_email(email)
+        if email and '@' in email and email not in emails:
+            emails.append(email)
+    
+    # Method 3: Additional email fields (Email 2, Email 3 mentioned in research)
+    for field_name in ['email2', 'email_2', 'email3', 'email_3']:
+        additional_email = contact.get(field_name)
+        if additional_email:
+            email = _normalize_email(additional_email)
+            if email and '@' in email and email not in emails:
+                emails.append(email)
+    
+    return emails
+
+
+def _contact_matches_email_filter(contact: Dict[str, Any], operator: str, value: str) -> bool:
+    """Check if contact matches email filter using comprehensive email extraction.
+    
+    CRITICAL: This function addresses the architectural limitation where server-side
+    email filtering is incomplete. It checks ALL email sources to ensure no contacts
+    are missed.
+    
+    Args:
+        contact: Contact data from API
+        operator: Filter operator (equals, contains, etc.)
+        value: Filter value to match against
+        
+    Returns:
+        True if contact matches the email filter, False otherwise
+    """
+    all_emails = _extract_all_emails(contact)
+    
+    if not all_emails:
+        return False
+    
+    value_lower = value.lower() if value else ""
+    
+    for email in all_emails:
+        email_lower = email.lower()
+        
+        if operator == "equals":
+            if email_lower == value_lower:
+                return True
+        elif operator == "contains":
+            if value_lower in email_lower:
+                return True
+        elif operator == "starts_with":
+            if email_lower.startswith(value_lower):
+                return True
+        elif operator == "ends_with":
+            if email_lower.endswith(value_lower):
+                return True
+        elif operator == "not_equals":
+            # For not_equals, ALL emails must not match (if any email matches, return False)
+            if email_lower == value_lower:
+                return False
+        # Add more operators as needed
+    
+    # For not_equals, if we get here, no emails matched, so return True
+    if operator == "not_equals":
+        return True
+    
+    return False
 
 
 class CustomFieldManager:

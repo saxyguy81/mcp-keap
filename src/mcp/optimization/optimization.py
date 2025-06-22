@@ -360,11 +360,14 @@ class QueryExecutor:
             operator = filter_item.get("operator", "")
             value = filter_item.get("value", "")
             
-            # Map email filters to API parameters
-            if field == "email" and operator == "contains":
-                server_params["email"] = f"*{value}*"
-            elif field == "email" and operator == "equals":
-                server_params["email"] = value
+            # Map filters to API parameters
+            # CRITICAL: email field filtering is ALWAYS done client-side due to architectural limitations:
+            # - email field can be null while email_addresses array has data
+            # - Server-side filtering on email field is incomplete and unreliable
+            # - Client-side filtering checks both email field AND email_addresses array
+            if field == "email":
+                # Force email filtering to client-side (NEVER optimize to server-side)
+                client_filters.append(filter_item)
             elif field == "given_name" and operator == "contains":
                 server_params["given_name"] = f"*{value}*"
             elif field == "given_name" and operator == "equals":
@@ -650,10 +653,21 @@ class QueryExecutor:
                             if cf.get("content") == value:
                                 contact_value = value
                                 break
+                elif field == "email":
+                    # CRITICAL: Use comprehensive email matching for email field
+                    # This addresses the architectural limitation where email field can be null
+                    # but email_addresses array has data
+                    from src.mcp.tools_collections import _contact_matches_email_filter
+                    
+                    if not _contact_matches_email_filter(contact, operator, value):
+                        matches = False
+                        break
+                    # Skip normal field matching for email - we handled it above
+                    continue
                 else:
                     contact_value = contact.get(field)
 
-                # Simple matching logic
+                # Simple matching logic for non-email fields
                 if operator in ["equals", "EQUALS", "="]:
                     if contact_value != value:
                         matches = False
