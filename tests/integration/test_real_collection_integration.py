@@ -122,8 +122,8 @@ class TestRealCollectionManager:
     def test_concurrent_collection_operations(self, real_collection_manager):
         """Test real concurrent operations on collections"""
         # Create base collections
-        collection_a = real_collection_manager.create_collection(list(range(1, 51)), "Large Collection A")
-        collection_b = real_collection_manager.create_collection(list(range(26, 76)), "Large Collection B")
+        real_collection_manager.create_collection(list(range(1, 51)), "Large Collection A")
+        real_collection_manager.create_collection(list(range(26, 76)), "Large Collection B")
         
         async def perform_operations():
             # Simulate concurrent operations

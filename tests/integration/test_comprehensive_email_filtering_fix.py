@@ -30,7 +30,7 @@ class TestComprehensiveEmailFilteringFix:
         """
         context = Context()
         
-        print(f"\n🔍 Testing that email filtering is forced to client-side...")
+        print("\n🔍 Testing that email filtering is forced to client-side...")
         
         # Test email filtering with optimization enabled
         result = await list_contacts(
@@ -48,13 +48,13 @@ class TestComprehensiveEmailFilteringFix:
         server_side_filters = metrics.get("server_side_filters", 0)
         client_side_filters = metrics.get("client_side_filters", 0)
         
-        print(f"Optimization metrics:")
+        print("Optimization metrics:")
         print(f"  Server-side filters: {server_side_filters}")
         print(f"  Client-side filters: {client_side_filters}")
         
         # Email filtering should ALWAYS be client-side
         assert client_side_filters > 0, "Email filtering should be processed client-side"
-        print(f"✅ Confirmed: Email filtering correctly forced to client-side")
+        print("✅ Confirmed: Email filtering correctly forced to client-side")
 
     @pytest.mark.asyncio
     async def test_comprehensive_email_extraction(self):
@@ -63,7 +63,7 @@ class TestComprehensiveEmailFilteringFix:
         """
         context = Context()
         
-        print(f"\n🔍 Testing comprehensive email extraction...")
+        print("\n🔍 Testing comprehensive email extraction...")
         
         # Get some contacts to test email extraction
         result = await list_contacts(context, limit=5)
@@ -94,14 +94,14 @@ class TestComprehensiveEmailFilteringFix:
             for email in all_emails:
                 assert "@" in email, f"Invalid email extracted: {email}"
         
-        print(f"✅ Email extraction test passed")
+        print("✅ Email extraction test passed")
 
     @pytest.mark.asyncio
     async def test_email_filter_matching_operators(self):
         """
         Test that email filter matching works with various operators.
         """
-        print(f"\n🔍 Testing email filter matching with various operators...")
+        print("\n🔍 Testing email filter matching with various operators...")
         
         # Create test contact data with various email scenarios
         test_contacts = [
@@ -150,7 +150,7 @@ class TestComprehensiveEmailFilteringFix:
             assert set(matching_contacts) == set(expected_contact_ids), \
                 f"Filter {operator}='{value}' failed: expected {expected_contact_ids}, got {matching_contacts}"
         
-        print(f"✅ Email filter matching test passed")
+        print("✅ Email filter matching test passed")
 
     @pytest.mark.asyncio
     async def test_email_filtering_completeness_comparison(self):
@@ -160,7 +160,7 @@ class TestComprehensiveEmailFilteringFix:
         """
         context = Context()
         
-        print(f"\n🔍 Testing email filtering completeness...")
+        print("\n🔍 Testing email filtering completeness...")
         
         # Test our comprehensive email filtering (client-side with comprehensive extraction)
         comprehensive_result = await list_contacts(
@@ -181,7 +181,7 @@ class TestComprehensiveEmailFilteringFix:
                 limit=3
             )
             
-            print(f"\nSample results verification:")
+            print("\nSample results verification:")
             for i, contact in enumerate(details.get("contacts", [])):
                 contact_id = contact.get("id")
                 all_emails = _extract_all_emails(contact)
@@ -193,13 +193,13 @@ class TestComprehensiveEmailFilteringFix:
                 assert has_gmail, f"Contact {contact_id} should contain @gmail.com in emails"
         
         # Test edge case: contacts that might have gmail in email_addresses but not email field
-        print(f"\nTesting comprehensive extraction finds contacts that might be missed...")
+        print("\nTesting comprehensive extraction finds contacts that might be missed...")
         
         # This is the critical test - our filtering should find all contacts with gmail addresses
         # in ANY email field, not just the primary email field
         assert comprehensive_result["count"] >= 0, "Should complete without error"
         
-        print(f"✅ Email filtering completeness test passed")
+        print("✅ Email filtering completeness test passed")
 
     @pytest.mark.asyncio
     async def test_email_filtering_architectural_documentation(self):
@@ -208,7 +208,7 @@ class TestComprehensiveEmailFilteringFix:
         """
         context = Context()
         
-        print(f"\n🔍 Testing architectural issue handling...")
+        print("\n🔍 Testing architectural issue handling...")
         
         # Test that email filtering works even when optimization is requested
         # (it should be forced to client-side due to our fix)
@@ -240,7 +240,7 @@ class TestComprehensiveEmailFilteringFix:
             print(f"  Operator '{operator}': {op_result['count']} contacts")
             assert isinstance(op_result["count"], int)
         
-        print(f"✅ Architectural issue handling test passed")
+        print("✅ Architectural issue handling test passed")
 
     @pytest.mark.asyncio
     async def test_email_filtering_performance_validation(self):
@@ -249,7 +249,7 @@ class TestComprehensiveEmailFilteringFix:
         """
         context = Context()
         
-        print(f"\n🔍 Testing email filtering performance...")
+        print("\n🔍 Testing email filtering performance...")
         
         import time
         start_time = time.time()
@@ -265,7 +265,7 @@ class TestComprehensiveEmailFilteringFix:
         end_time = time.time()
         duration = end_time - start_time
         
-        print(f"Email filtering performance:")
+        print("Email filtering performance:")
         print(f"  Contacts found: {result['count']}")
         print(f"  Time taken: {duration:.2f} seconds")
         print(f"  Performance: {result['count'] / max(duration, 0.1):.1f} contacts/second")
@@ -273,4 +273,4 @@ class TestComprehensiveEmailFilteringFix:
         # Basic performance validation - should complete in reasonable time
         assert duration < 30.0, f"Email filtering took too long: {duration:.2f} seconds"
         
-        print(f"✅ Email filtering performance validation passed")
+        print("✅ Email filtering performance validation passed")

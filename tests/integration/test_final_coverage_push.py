@@ -297,15 +297,6 @@ class TestSpecificUncoveredLines:
         """Test readonly field filtering in tag modifications"""
         try:
             # Test with readonly fields that should be filtered out
-            tag_update_with_readonly = {
-                "tag_id": 1,
-                "name": "New Name",
-                "usage_stats": {"contact_count": 100},  # Readonly
-                "contact_count": 50,  # Readonly
-                "last_applied": "2024-01-01",  # Readonly
-                "created_date": "2024-01-01",  # Readonly
-                "id": 1  # Readonly
-            }
             
             # Test basic tag operations instead
             tags_result = await get_tags(context, limit=1)

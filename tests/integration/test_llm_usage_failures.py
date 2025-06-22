@@ -205,7 +205,7 @@ class TestLLMUsageFailures:
                 
                 # Check if we got any contacts back
                 if contact_count == 0:
-                    print(f"    ⚠️  CONSISTENCY ISSUE: Empty contacts array returned")
+                    print("    ⚠️  CONSISTENCY ISSUE: Empty contacts array returned")
                 else:
                     # Check which fields are actually present
                     first_contact = result["contacts"][0]
@@ -232,7 +232,7 @@ class TestLLMUsageFailures:
                 })
         
         # Analyze consistency
-        print(f"\n📊 Consistency Analysis:")
+        print("\n📊 Consistency Analysis:")
         contact_counts = [r.get("contact_count", 0) for r in results if "contact_count" in r]
         unique_counts = set(contact_counts)
         
@@ -254,9 +254,9 @@ class TestLLMUsageFailures:
             # Check field consistency across attempts
             field_sets = [set(r.get("fields_present", [])) for r in results if "fields_present" in r]
             if len(set(tuple(sorted(fs)) for fs in field_sets)) > 1:
-                pytest.fail(f"CRITICAL CONSISTENCY BUG: Fields present varied across attempts")
+                pytest.fail("CRITICAL CONSISTENCY BUG: Fields present varied across attempts")
         
-        print(f"✅ Field selection consistency test passed")
+        print("✅ Field selection consistency test passed")
 
     @pytest.mark.asyncio 
     async def test_response_truncation_handling(self):
@@ -304,7 +304,7 @@ class TestLLMUsageFailures:
                     # Check that the last contact is complete (has basic fields)
                     assert "id" in last_contact, "Last contact missing ID - possible truncation"
                     
-                    print(f"✅ Large response handling: Last contact complete")
+                    print("✅ Large response handling: Last contact complete")
             
             # Test field-limited version for comparison
             limited_result = await get_collection_details(
@@ -319,7 +319,7 @@ class TestLLMUsageFailures:
             print(f"Limited response size: {limited_size:,} characters")
             assert limited_size < response_size, "Field limiting should reduce response size"
             
-            print(f"✅ Response truncation test passed")
+            print("✅ Response truncation test passed")
             
         except Exception as e:
             pytest.fail(f"Response truncation test failed: {e}")
@@ -333,7 +333,7 @@ class TestLLMUsageFailures:
         """
         context = Context()
         
-        print(f"\n🔍 Testing contact schema reliability")
+        print("\n🔍 Testing contact schema reliability")
         
         # Test multiple calls to ensure consistency
         for attempt in range(3):
@@ -354,7 +354,7 @@ class TestLLMUsageFailures:
             except Exception as e:
                 pytest.fail(f"Contact schema failed on attempt {attempt + 1}: {e}")
         
-        print(f"✅ Contact schema reliability test passed")
+        print("✅ Contact schema reliability test passed")
 
     @pytest.mark.asyncio
     async def test_end_to_end_name_search_workflow(self):
@@ -369,7 +369,7 @@ class TestLLMUsageFailures:
         """
         context = Context()
         
-        print(f"\n🔍 Testing end-to-end name search workflow")
+        print("\n🔍 Testing end-to-end name search workflow")
         
         # Step 1: Get schema (user reported this worked)
         print("Step 1: Getting contact schema...")
@@ -427,4 +427,4 @@ class TestLLMUsageFailures:
                 found_any = True
         
         assert found_any, "End-to-end name search workflow should find at least some contacts"
-        print(f"✅ End-to-end name search workflow test passed")
+        print("✅ End-to-end name search workflow test passed")

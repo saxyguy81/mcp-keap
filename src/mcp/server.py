@@ -7,6 +7,7 @@ for interacting with Keap CRM.
 
 import logging
 import json
+from typing import Optional, List, Dict, Any, Union
 
 from fastmcp import FastMCP
 
@@ -31,15 +32,30 @@ class KeapMCPServer:
         self._register_resources()
 
     def _register_tools(self):
-        """Register the 11 streamlined collection-based MCP tools"""
+        """Register the 13 streamlined collection-based MCP tools.
+        
+        Tools Summary:
+        - Core Contact Operations (2): list_contacts, get_contact_schema  
+        - Collection Operations (4): union, intersect, diff, create_from_ids
+        - Collection Data Access (3): get_collection_details, get_collection_fields, set_collection_fields
+        - Tag Operations (2): get_tags, modify_collection_tags
+        - Field Operations (1): modify_contact_fields
+        - System Operations (1): get_api_diagnostics
+        
+        Features:
+        - JSON string and Python list filter support
+        - Default 1000 contact limit (API maximum)
+        - Comprehensive field selection
+        - Collection-based operations for performance
+        """
 
         # Core Contact Operations (2 tools)
         @self.mcp.tool()
         async def list_contacts(
-            filters=None,
-            limit: int = 200,
+            filters: Optional[Union[str, List[Dict[str, Any]]]] = None,
+            limit: int = 1000,
             offset: int = 0,
-            order_by=None,
+            order_by: Optional[str] = None,
             order_direction: str = "ASC",
         ):
             """Universal contact search with comprehensive filters, returns collection ID.
@@ -47,11 +63,31 @@ class KeapMCPServer:
             This is the primary contact search tool that replaces search_contacts_by_email,
             search_contacts_by_name, query_contacts_by_custom_field, etc.
             
-            Example filters:
+            Args:
+                filters: List of filter conditions or JSON string. Accepts both formats:
+                    - Python list: [{"field": "given_name", "operator": "equals", "value": "Scott"}]
+                    - JSON string: '[{"field": "given_name", "operator": "equals", "value": "Scott"}]'
+                limit: Maximum contacts to return (default: 1000, API maximum)
+                offset: Number of contacts to skip (default: 0)
+                order_by: Field to sort by (optional)
+                order_direction: Sort direction - "ASC" or "DESC" (default: "ASC")
+            
+            Returns:
+                Dictionary with collection_id and count of contacts found
+            
+            Example filters (both formats supported):
                 [{"field": "email", "operator": "contains", "value": "@company.com"}]
                 [{"field": "given_name", "operator": "equals", "value": "John"}]
+                [{"field": "family_name", "operator": "contains", "value": "Smith"}]
                 [{"field": "custom_field_7", "operator": "equals", "value": "VIP"}]
                 [{"field": "tags", "operator": "contains", "value": "customer"}]
+                
+            JSON string format (MCP client compatibility):
+                '[{"field": "given_name", "operator": "equals", "value": "Scott"}]'
+                
+            Multiple filters (AND logic):
+                [{"field": "given_name", "operator": "equals", "value": "John"},
+                 {"field": "email", "operator": "contains", "value": "@company.com"}]
             """
             from src.mcp.tools_collections import list_contacts as _list_contacts
             from mcp.server.fastmcp import Context
@@ -131,21 +167,44 @@ class KeapMCPServer:
             return await _create_from_ids(context, contact_ids, name)
 
         @self.mcp.tool()
-        async def get_collection_details(collection_id: str, fields=None, count_only=False):
-            """Fetch contact data with field selection from collection.
+        async def get_collection_details(collection_id: str, fields=None, count_only=False, limit=None):
+            """Fetch contact data with comprehensive field selection from collection.
             
             This consolidated function replaces collection_count and get_collection_ids.
+            Supports flexible field selection for efficient data retrieval.
             
             Args:
-                collection_id: Collection identifier
-                fields: List of fields to include (None for all, ["id"] for IDs only)
-                count_only: If True, return only count information
+                collection_id: Collection identifier returned from list_contacts
+                fields: List of fields to include. Options:
+                    - None: Return all available fields (default)
+                    - ["id"]: Return only contact IDs (most efficient)
+                    - Standard fields: ["given_name", "family_name", "email", "email_addresses", "company", "phone1", "city", "state"]
+                    - Custom fields: ["custom_field_7", "6FN Next Date/Time"] (use field names or IDs)
+                    - Mixed: ["id", "given_name", "email_addresses", "custom_field_7"]
+                count_only: If True, return only count information (fastest)
+                limit: Maximum contacts to return (None for all in collection)
+            
+            Returns:
+                Dictionary with 'contacts' list, 'count', and optional 'metrics'
+                
+            Examples:
+                # Get all data for first 10 contacts
+                get_collection_details("contacts_abc123", limit=10)
+                
+                # Get only names and emails (efficient)
+                get_collection_details("contacts_abc123", ["given_name", "family_name", "email_addresses"])
+                
+                # Get only contact IDs (most efficient)
+                get_collection_details("contacts_abc123", ["id"])
+                
+                # Get count only (fastest)
+                get_collection_details("contacts_abc123", count_only=True)
             """
             from src.mcp.tools_collections import get_collection_details as _get_details
             from mcp.server.fastmcp import Context
 
             context = Context()
-            return await _get_details(context, collection_id, fields, count_only)
+            return await _get_details(context, collection_id, fields, limit, count_only)
 
         # Tag Operations (2 tools)
         @self.mcp.tool()

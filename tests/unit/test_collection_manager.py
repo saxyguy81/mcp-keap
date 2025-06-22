@@ -216,8 +216,8 @@ class TestCollectionManager:
         short_ttl_manager = CollectionManager(default_ttl=0.1)
         
         # Create multiple collections
-        id1 = short_ttl_manager.create_collection([1, 2])
-        id2 = short_ttl_manager.create_collection([3, 4])
+        short_ttl_manager.create_collection([1, 2])
+        short_ttl_manager.create_collection([3, 4])
         
         # Both should exist
         assert len(short_ttl_manager.list_collections()) == 2

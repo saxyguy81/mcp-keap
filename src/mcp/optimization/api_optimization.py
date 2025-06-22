@@ -145,15 +145,17 @@ class ApiParameterOptimizer:
                         else:
                             server_filters[api_field] = value
                     elif operator == "IN" and isinstance(value, list):
-                        # For IN operator, we might need to use multiple API calls or client-side filtering
-                        if len(value) <= 5:  # Small lists can be handled server-side
-                            server_filters[api_field] = value[
-                                0
-                            ]  # Use first value for now
+                        # CRITICAL FIX: For contact ID lists, force client-side filtering
+                        # The previous code only used the first ID server-side, losing 99% of results
+                        # This caused the get_collection_details function to return 0 contacts
+                        if api_field == "id" and len(value) > 1:
+                            # Force all contact ID lookups to client-side for accuracy
+                            client_filters.append(filter_condition)
+                            logger.info(f"Forcing {len(value)} contact IDs to client-side filtering for accuracy")
+                        elif len(value) <= 5:  # Small non-ID lists can be handled server-side
+                            server_filters[api_field] = value[0]  # Use first value for now
                             if len(value) > 1:
-                                client_filters.append(
-                                    filter_condition
-                                )  # Rest handled client-side
+                                client_filters.append(filter_condition)  # Rest handled client-side
                         else:
                             client_filters.append(filter_condition)
                     else:

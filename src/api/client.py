@@ -547,7 +547,7 @@ class KeapApiService:
         """
         try:
             # Try v1 API first (DELETE /tags/{tagId})
-            result = await self.delete(f"/tags/{tag_id}")
+            await self.delete(f"/tags/{tag_id}")
             return {"id": int(tag_id), "deleted": True, "api_version": "v1"}
         except Exception as v1_error:
             if "405" in str(v1_error) or "Method Not Allowed" in str(v1_error):

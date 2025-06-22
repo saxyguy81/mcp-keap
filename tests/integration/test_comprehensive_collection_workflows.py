@@ -54,7 +54,7 @@ class TestComprehensiveCollectionOperations:
     async def test_complete_collection_lifecycle(self, context, skip_if_no_api_key):
         """Test complete collection lifecycle from creation to cleanup"""
         collection_manager = get_collection_manager()
-        initial_count = len(collection_manager.collections)
+        len(collection_manager.collections)
         
         # Step 1: Create primary collection
         result1 = await list_contacts(context, limit=5, enable_optimization=True)
@@ -73,12 +73,12 @@ class TestComprehensiveCollectionOperations:
         
         # Step 4: Test intersection operation
         intersect_result = await collection_intersect(context, [collection_id_1, collection_id_2])
-        intersect_collection_id = intersect_result["collection_id"]
+        intersect_result["collection_id"]
         assert intersect_result["count"] >= 0
         
         # Step 5: Test difference operation
         diff_result = await collection_diff(context, collection_id_1, [collection_id_2])
-        diff_collection_id = diff_result["collection_id"]
+        diff_result["collection_id"]
         assert diff_result["count"] >= 0
         
         # Step 6: Verify mathematical relationships

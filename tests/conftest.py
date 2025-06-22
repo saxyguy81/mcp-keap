@@ -16,13 +16,13 @@ from typing import Dict, Any
 from unittest.mock import AsyncMock
 
 from dotenv import load_dotenv
+from src.cache.manager import CacheManager
+from src.api.client import KeapApiService
 
 # Suppress blake2 hash algorithm warnings during tests
 logging.getLogger("root").setLevel(logging.CRITICAL)
 warnings.filterwarnings("ignore", message=".*blake2.*not found.*")
 warnings.filterwarnings("ignore", category=UserWarning, module="hashlib")
-from src.cache.manager import CacheManager
-from src.api.client import KeapApiService
 
 # Load environment variables from .env file if it exists
 env_file = Path(__file__).parent.parent / ".env"

@@ -141,7 +141,7 @@ class TestFinalCoverageTargets:
                         if fields and len(fields) > 1:
                             # Should have some of the requested fields
                             contact_fields = set(contact.keys())
-                            requested_fields = set(fields)
+                            set(fields)
                             # At least ID should be present
                             assert "id" in contact_fields
 

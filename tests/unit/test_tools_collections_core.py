@@ -98,14 +98,14 @@ class TestFieldMatching:
     def test_field_matches_condition_string_equals(self):
         """Test string equals condition"""
         contact = {"given_name": "John", "family_name": "Doe"}
-        assert _field_matches_condition(contact, "given_name", "equals", "John") == True
-        assert _field_matches_condition(contact, "given_name", "equals", "Jane") == False
+        assert _field_matches_condition(contact, "given_name", "equals", "John")
+        assert not _field_matches_condition(contact, "given_name", "equals", "Jane")
     
     def test_field_matches_condition_string_contains(self):
         """Test string contains condition"""
         contact = {"given_name": "John", "family_name": "Doe"}
-        assert _field_matches_condition(contact, "given_name", "contains", "oh") == True
-        assert _field_matches_condition(contact, "given_name", "contains", "Jane") == False
+        assert _field_matches_condition(contact, "given_name", "contains", "oh")
+        assert not _field_matches_condition(contact, "given_name", "contains", "Jane")
     
     def test_field_matches_condition_email_special_handling(self):
         """Test email field special handling"""
@@ -114,20 +114,20 @@ class TestFieldMatching:
                 {"email": "john@example.com", "field": "EMAIL1"}
             ]
         }
-        assert _field_matches_condition(contact, "email", "contains", "john") == True
-        assert _field_matches_condition(contact, "email", "contains", "jane") == False
+        assert _field_matches_condition(contact, "email", "contains", "john")
+        assert not _field_matches_condition(contact, "email", "contains", "jane")
     
     def test_field_matches_condition_numeric(self):
         """Test numeric field conditions"""
         contact = {"id": 123, "age": 25}
-        assert _field_matches_condition(contact, "id", "equals", 123) == True
-        assert _field_matches_condition(contact, "age", "greater_than", 20) == True
-        assert _field_matches_condition(contact, "age", "less_than", 30) == True
+        assert _field_matches_condition(contact, "id", "equals", 123)
+        assert _field_matches_condition(contact, "age", "greater_than", 20)
+        assert _field_matches_condition(contact, "age", "less_than", 30)
     
     def test_field_matches_condition_missing_field(self):
         """Test missing field handling"""
         contact = {"given_name": "John"}
-        assert _field_matches_condition(contact, "family_name", "equals", "Doe") == False
+        assert not _field_matches_condition(contact, "family_name", "equals", "Doe")
 
 
 class TestEmailMatching:
@@ -141,9 +141,9 @@ class TestEmailMatching:
                 {"email": "john@work.com", "field": "EMAIL2"}
             ]
         }
-        assert _email_matches_condition(contact, "contains", "john") == True
-        assert _email_matches_condition(contact, "contains", "example.com") == True
-        assert _email_matches_condition(contact, "contains", "jane") == False
+        assert _email_matches_condition(contact, "contains", "john")
+        assert _email_matches_condition(contact, "contains", "example.com")
+        assert not _email_matches_condition(contact, "contains", "jane")
     
     def test_email_matches_condition_equals(self):
         """Test email equals matching"""
@@ -152,8 +152,8 @@ class TestEmailMatching:
                 {"email": "john@example.com", "field": "EMAIL1"}
             ]
         }
-        assert _email_matches_condition(contact, "equals", "john@example.com") == True
-        assert _email_matches_condition(contact, "equals", "jane@example.com") == False
+        assert _email_matches_condition(contact, "equals", "john@example.com")
+        assert not _email_matches_condition(contact, "equals", "jane@example.com")
     
     def test_email_matches_condition_starts_with(self):
         """Test email starts_with matching"""
@@ -162,13 +162,13 @@ class TestEmailMatching:
                 {"email": "john.doe@example.com", "field": "EMAIL1"}
             ]
         }
-        assert _email_matches_condition(contact, "starts_with", "john") == True
-        assert _email_matches_condition(contact, "starts_with", "jane") == False
+        assert _email_matches_condition(contact, "starts_with", "john")
+        assert not _email_matches_condition(contact, "starts_with", "jane")
     
     def test_email_matches_condition_no_emails(self):
         """Test email matching with no emails"""
         contact = {"email_addresses": []}
-        assert _email_matches_condition(contact, "contains", "john") == False
+        assert not _email_matches_condition(contact, "contains", "john")
 
 
 class TestContactMatching:
@@ -183,10 +183,10 @@ class TestContactMatching:
             ]
         }
         filters = [{"field": "given_name", "operator": "equals", "value": "John"}]
-        assert _contact_matches_filters(contact, filters) == True
+        assert _contact_matches_filters(contact, filters)
         
         filters = [{"field": "given_name", "operator": "equals", "value": "Jane"}]
-        assert _contact_matches_filters(contact, filters) == False
+        assert not _contact_matches_filters(contact, filters)
     
     def test_contact_matches_filters_multiple_filters(self):
         """Test contact matching with multiple filters (AND logic)"""
@@ -201,18 +201,18 @@ class TestContactMatching:
             {"field": "given_name", "operator": "equals", "value": "John"},
             {"field": "email", "operator": "contains", "value": "example.com"}
         ]
-        assert _contact_matches_filters(contact, filters) == True
+        assert _contact_matches_filters(contact, filters)
         
         filters = [
             {"field": "given_name", "operator": "equals", "value": "John"},
             {"field": "email", "operator": "contains", "value": "other.com"}
         ]
-        assert _contact_matches_filters(contact, filters) == False
+        assert not _contact_matches_filters(contact, filters)
     
     def test_contact_matches_filters_empty_filters(self):
         """Test contact matching with empty filters"""
         contact = {"given_name": "John"}
-        assert _contact_matches_filters(contact, []) == True
+        assert _contact_matches_filters(contact, [])
 
 
 class TestApplyFilters:
@@ -270,7 +270,7 @@ class TestCustomFieldManagerUnit:
         manager = CustomFieldManager()
         assert manager.field_definitions == {}
         assert manager.name_to_id_mapping == {}
-        assert manager.loaded == False
+        assert not manager.loaded
     
     def test_get_field_id_success(self):
         """Test successful field ID retrieval"""

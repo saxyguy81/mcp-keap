@@ -27,7 +27,7 @@ class TestEmailFieldInconsistencies:
         """
         context = Context()
         
-        print(f"\n🔍 Searching for email field inconsistencies...")
+        print("\n🔍 Searching for email field inconsistencies...")
         
         # Get a larger sample to find edge cases
         result = await list_contacts(context, limit=50)
@@ -65,7 +65,7 @@ class TestEmailFieldInconsistencies:
             elif not email_field and not email_addresses:
                 null_email_null_addresses += 1
         
-        print(f"\n📊 Email Field Analysis:")
+        print("\n📊 Email Field Analysis:")
         print(f"  Contacts with email=null but email_addresses=populated: {null_email_with_addresses}")
         print(f"  Contacts with email=populated and email_addresses=populated: {populated_email_with_addresses}")
         print(f"  Contacts with email=null and email_addresses=null: {null_email_null_addresses}")
@@ -80,7 +80,7 @@ class TestEmailFieldInconsistencies:
                 "total_analyzed": len(contacts)
             }
         else:
-            print(f"\n✅ No inconsistencies found in this sample, but they may exist in larger dataset")
+            print("\n✅ No inconsistencies found in this sample, but they may exist in larger dataset")
             return {
                 "inconsistent_contacts": [],
                 "would_be_missed": 0,
@@ -94,7 +94,7 @@ class TestEmailFieldInconsistencies:
         """
         context = Context()
         
-        print(f"\n🔍 Comparing server-side vs client-side email filtering completeness...")
+        print("\n🔍 Comparing server-side vs client-side email filtering completeness...")
         
         # Test server-side filtering (uses email field only)
         print("Testing server-side email filtering...")
@@ -133,7 +133,7 @@ class TestEmailFieldInconsistencies:
                     limit=5
                 )
                 
-                print(f"\nSample of client-side results:")
+                print("\nSample of client-side results:")
                 for i, contact in enumerate(client_details.get("contacts", [])):
                     email_field = contact.get("email")
                     email_addresses = contact.get("email_addresses", [])
@@ -146,7 +146,7 @@ class TestEmailFieldInconsistencies:
                 "completeness_issue": True
             }
         elif client_result["count"] == server_result["count"]:
-            print(f"\n✅ Same results from both approaches in this sample")
+            print("\n✅ Same results from both approaches in this sample")
             return {
                 "server_count": server_result["count"],
                 "client_count": client_result["count"],
@@ -154,7 +154,7 @@ class TestEmailFieldInconsistencies:
                 "completeness_issue": False
             }
         else:
-            print(f"\n❓ Unexpected: Server-side found more than client-side")
+            print("\n❓ Unexpected: Server-side found more than client-side")
             return {
                 "server_count": server_result["count"],
                 "client_count": client_result["count"],
@@ -169,7 +169,7 @@ class TestEmailFieldInconsistencies:
         """
         context = Context()
         
-        print(f"\n🔍 Testing comprehensive email search strategy...")
+        print("\n🔍 Testing comprehensive email search strategy...")
         
         # Strategy 1: Search using email field (server-side optimized)
         email_field_result = await list_contacts(
@@ -194,7 +194,7 @@ class TestEmailFieldInconsistencies:
             email_addresses_result = {"count": 0}
             email_addresses_supported = False
         
-        print(f"Results:")
+        print("Results:")
         print(f"  email field filtering: {email_field_result['count']} contacts")
         print(f"  email_addresses field filtering: {email_addresses_result['count']} contacts")
         
@@ -202,10 +202,10 @@ class TestEmailFieldInconsistencies:
         # 1. Use client-side filtering that checks both email field AND email_addresses array
         # 2. Or use a custom search strategy that handles the architecture properly
         
-        print(f"\n💡 Recommended approach:")
-        print(f"  - Force email filtering to client-side processing")
-        print(f"  - Client-side logic should check both email field AND email_addresses array")
-        print(f"  - This ensures no contacts are missed due to field inconsistencies")
+        print("\n💡 Recommended approach:")
+        print("  - Force email filtering to client-side processing")
+        print("  - Client-side logic should check both email field AND email_addresses array")
+        print("  - This ensures no contacts are missed due to field inconsistencies")
         
         return {
             "email_field_count": email_field_result["count"],

@@ -539,7 +539,7 @@ def get_cache_manager() -> CacheManager:
 async def list_contacts(
     context: Context,
     filters: Optional[List[Dict[str, Any]]] = None,
-    limit: int = 200,
+    limit: int = 1000,
     offset: int = 0,
     order_by: Optional[str] = None,
     order_direction: str = "ASC",
@@ -583,6 +583,9 @@ async def list_contacts(
     collection_manager = get_collection_manager()
     
     try:
+        # Parse filters from JSON string if needed (MCP interface compatibility)
+        filters = _parse_filters(filters)
+        
         # Early validation of filter structure (before API calls)
         if filters:
             _validate_filter_structure(filters)
@@ -1064,7 +1067,10 @@ async def get_collection_details(
                 # Fall back to individual calls strategy
                 enable_optimization = False
         
-        if not enable_optimization or len(target_ids) <= 50:
+        if not enable_optimization or len(target_ids) <= 200:
+            # CRITICAL FIX: Increased threshold from 50 to 200 for individual calls
+            # The bulk strategy has critical ID matching bugs and is unreliable
+            # Individual calls are more reliable even for larger collections
             # Small collection: Use individual API calls (most reliable)
             logger.info(f"Fetching details for {len(target_ids)} contacts using individual calls strategy")
             target_list = list(target_ids)
@@ -1115,7 +1121,20 @@ async def get_collection_details(
                 # Filter for contacts in our collection
                 for contact in batch_contacts:
                     contact_id = contact["id"]
-                    if contact_id in target_ids and contact_id not in found_ids:
+                    # CRITICAL FIX: Use consistent ID comparison (int-to-int) to avoid string/int mismatches
+                    # Convert both contact_id and target_ids to consistent types for accurate matching
+                    is_target_contact = False
+                    try:
+                        contact_id_int = int(contact_id)
+                        target_ids_int = {int(tid) for tid in target_ids}
+                        found_ids_int = {int(fid) for fid in found_ids}
+                        
+                        is_target_contact = contact_id_int in target_ids_int and contact_id_int not in found_ids_int
+                    except (ValueError, TypeError):
+                        # Fallback to original comparison if type conversion fails
+                        is_target_contact = contact_id in target_ids and contact_id not in found_ids
+                    
+                    if is_target_contact:
                         # Add extracted email to contact data
                         contact['email'] = _extract_email(contact)
                         
@@ -1474,9 +1493,9 @@ async def _comprehensive_contact_search(
     matching_contacts = []
     searched_contact_ids = set()
     
-    # Strategy 1: Search newest contacts first (where smhanan contacts are)
+    # Strategy 1: Search newest contacts first (optimized batch size)
     logger.info("Strategy 1: Searching newest contacts first")
-    newest_batch_size = min(500, limit * 3)  # Search more than requested to find matches
+    newest_batch_size = min(1000, limit * 3)  # Use API maximum for efficiency
     
     newest_data = await api_client.get_contacts(
         limit=newest_batch_size,
@@ -1530,42 +1549,69 @@ async def _comprehensive_contact_search(
                     if len(matching_contacts) >= limit:
                         break
     
-    # Strategy 3: If still need more matches, do additional batched search
+    # Strategy 3: EXHAUSTIVE PAGINATION - Search ALL remaining contacts until API returns empty
     if len(matching_contacts) < limit:
-        logger.info(f"Strategy 3: Additional batched search (current matches: {len(matching_contacts)})")
+        logger.info(f"Strategy 3: EXHAUSTIVE pagination search (current matches: {len(matching_contacts)})")
         
-        # Search in batches across different parts of the database
-        additional_batch_size = 200
-        max_additional_batches = 5  # Limit to prevent excessive API calls
+        # Start from where we left off and search ALL remaining contacts
+        batch_size = 1000  # Maximum API limit for optimal efficiency
+        current_batch_offset = newest_batch_size  # Start after the newest batch
+        max_total_contacts = 50000  # Safety limit (50k contacts)
+        total_searched_in_exhaustive = 0
         
-        for batch_num in range(max_additional_batches):
-            batch_offset = newest_batch_size + (batch_num * additional_batch_size)
+        logger.info(f"Starting exhaustive search from offset {current_batch_offset}")
+        
+        while (len(matching_contacts) < limit and 
+               total_searched_in_exhaustive < max_total_contacts):
             
-            batch_data = await api_client.get_contacts(
-                limit=additional_batch_size,
-                offset=batch_offset,
-                order_by="date_created",
-                order_direction="DESC",
-                include_custom_fields=True,
-                include_tags=True
-            )
-            
-            batch_contacts = batch_data.get("contacts", [])
-            if not batch_contacts:
-                break  # No more contacts
-            
-            logger.info(f"Batch {batch_num + 1}: Retrieved {len(batch_contacts)} contacts from offset {batch_offset}")
-            
-            for contact in batch_contacts:
-                contact['email'] = _extract_email(contact)
-                if _contact_matches_filters(contact, filters):
-                    if contact['id'] not in searched_contact_ids:
-                        matching_contacts.append(contact)
-                        searched_contact_ids.add(contact['id'])
-                        
-                        if len(matching_contacts) >= limit:
-                            logger.info(f"Found {len(matching_contacts)} total matches")
-                            return matching_contacts[:limit]
+            try:
+                batch_data = await api_client.get_contacts(
+                    limit=batch_size,
+                    offset=current_batch_offset,
+                    order_by="date_created",
+                    order_direction="DESC",
+                    include_custom_fields=True,
+                    include_tags=True
+                )
+                
+                batch_contacts = batch_data.get("contacts", [])
+                batch_count = len(batch_contacts)
+                
+                # If no contacts returned, we've reached the end of the database
+                if batch_count == 0:
+                    logger.info(f"Reached end of database at offset {current_batch_offset}")
+                    break
+                
+                total_searched_in_exhaustive += batch_count
+                
+                # Log progress every 5 batches
+                batch_num = (current_batch_offset - newest_batch_size) // batch_size + 1
+                if batch_num % 5 == 1:  # Log first batch and every 5th
+                    logger.info(f"Exhaustive batch {batch_num}: {batch_count} contacts from offset {current_batch_offset} (total searched: {total_searched_in_exhaustive})")
+                
+                # Process contacts in this batch
+                for contact in batch_contacts:
+                    contact['email'] = _extract_email(contact)
+                    if _contact_matches_filters(contact, filters):
+                        if contact['id'] not in searched_contact_ids:
+                            matching_contacts.append(contact)
+                            searched_contact_ids.add(contact['id'])
+                            
+                            # Early exit if we found enough matches
+                            if len(matching_contacts) >= limit:
+                                logger.info(f"Found {len(matching_contacts)} matches after exhaustive search")
+                                return matching_contacts[:limit]
+                
+                # Move to next batch
+                current_batch_offset += batch_size
+                
+            except Exception as e:
+                logger.error(f"Error in exhaustive batch at offset {current_batch_offset}: {e}")
+                # Continue to next batch instead of failing completely
+                current_batch_offset += batch_size
+                continue
+        
+        logger.info(f"Exhaustive search complete: searched {total_searched_in_exhaustive} additional contacts")
     
     logger.info(f"Comprehensive search complete: {len(matching_contacts)} matches found")
     return matching_contacts[:limit]
@@ -1591,6 +1637,36 @@ def _apply_filters(contacts: List[Dict], filters: List[Dict]) -> List[Dict]:
             filtered_contacts.append(contact)
     
     return filtered_contacts
+
+
+def _parse_filters(filters) -> List[Dict[str, Any]]:
+    """Parse filters from JSON string or return as-is if already parsed.
+    
+    Args:
+        filters: Filters as JSON string, Python list, or None
+        
+    Returns:
+        Parsed filters as a list of dictionaries
+        
+    Raises:
+        ValueError: If filters cannot be parsed or are invalid format
+    """
+    if filters is None:
+        return []
+    
+    if isinstance(filters, str):
+        try:
+            import json
+            parsed = json.loads(filters)
+            if not isinstance(parsed, list):
+                raise ValueError(f"Parsed filters must be a list, got {type(parsed).__name__}")
+            return parsed
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON format for filters: {e}")
+    elif isinstance(filters, list):
+        return filters
+    else:
+        raise ValueError(f"Filters must be a list of filter objects or a JSON string, got {type(filters).__name__}")
 
 
 def _validate_filter_structure(filters: List[Dict]) -> None:
@@ -1724,11 +1800,36 @@ def _field_matches_condition(contact: Dict, field: str, operator: str, value: An
             return False
     elif operator == "in":
         if isinstance(value, (list, tuple)):
-            return str(contact_value).lower() in [str(v).lower() for v in value]
+            # CRITICAL FIX: For ID fields, use numeric comparison to avoid string/int mismatches
+            # This fixes the data truncation issue where 0 contacts were returned
+            if field == "id":
+                try:
+                    # Convert both contact_value and list values to integers for accurate comparison
+                    contact_id = int(contact_value)
+                    target_ids = [int(v) for v in value]
+                    return contact_id in target_ids
+                except (ValueError, TypeError):
+                    # Fallback to string comparison if conversion fails
+                    return str(contact_value) in [str(v) for v in value]
+            else:
+                # For non-ID fields, use case-insensitive string comparison
+                return str(contact_value).lower() in [str(v).lower() for v in value]
         return False
     elif operator == "not_in":
         if isinstance(value, (list, tuple)):
-            return str(contact_value).lower() not in [str(v).lower() for v in value]
+            # CRITICAL FIX: For ID fields, use numeric comparison (same as "in" operator)
+            if field == "id":
+                try:
+                    # Convert both contact_value and list values to integers for accurate comparison
+                    contact_id = int(contact_value)
+                    target_ids = [int(v) for v in value]
+                    return contact_id not in target_ids
+                except (ValueError, TypeError):
+                    # Fallback to string comparison if conversion fails
+                    return str(contact_value) not in [str(v) for v in value]
+            else:
+                # For non-ID fields, use case-insensitive string comparison
+                return str(contact_value).lower() not in [str(v).lower() for v in value]
         return True
     
     return False

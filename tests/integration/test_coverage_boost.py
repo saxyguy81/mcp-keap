@@ -19,24 +19,24 @@ class TestCoverageBoost:
         """Test validation function handles edge cases gracefully"""
         # Test that validation function works with None
         result = await _validate_field_value("given_name", None)
-        assert result["valid"] == True  # No specific validation configured for this field
+        assert result["valid"]  # No specific validation configured for this field
         assert isinstance(result["errors"], list)
         
         # Test with empty string
         result = await _validate_field_value("given_name", "")
-        assert result["valid"] == True  # No specific validation configured
+        assert result["valid"]  # No specific validation configured
 
     @pytest.mark.asyncio
     async def test_validation_type_errors(self):
         """Test validation function handles different types gracefully"""
         # Test that validation function works with different types
         result = await _validate_field_value("given_name", 12345)
-        assert result["valid"] == True  # No type validation configured for this field
+        assert result["valid"]  # No type validation configured for this field
         assert isinstance(result["errors"], list)
         
         # Test phone validation 
         result = await _validate_field_value("phone", "123")
-        assert result["valid"] == True  # No specific validation configured
+        assert result["valid"]  # No specific validation configured
         assert isinstance(result["errors"], list)
 
     def test_normalize_datetime_date_only(self):
@@ -52,14 +52,14 @@ class TestCoverageBoost:
     def test_datetime_field_edge_cases(self):
         """Test datetime field detection edge cases"""
         # Test known datetime field patterns
-        assert _is_datetime_field("appointment_date") == True
-        assert _is_datetime_field("created_date") == True
-        assert _is_datetime_field("birthday") == True
+        assert _is_datetime_field("appointment_date")
+        assert _is_datetime_field("created_date")
+        assert _is_datetime_field("birthday")
         
         # Test non-datetime fields
-        assert _is_datetime_field("contact_name") == False
-        assert _is_datetime_field("tag_list") == False
-        assert _is_datetime_field("email") == False
+        assert not _is_datetime_field("contact_name")
+        assert not _is_datetime_field("tag_list")
+        assert not _is_datetime_field("email")
 
     def test_convert_datetime_timezone_edge_cases(self):
         """Test datetime conversion with timezone edge cases"""
@@ -109,16 +109,16 @@ class TestCoverageBoost:
         """Test comprehensive validation scenarios"""
         # Test field not in mappings (should pass validation)
         result = await _validate_field_value("unknown_field", "any_value")
-        assert result["valid"] == True
+        assert result["valid"]
         
         # Test None value for non-required field
         result = await _validate_field_value("family_name", None)
-        assert result["valid"] == True  # family_name is not required
+        assert result["valid"]  # family_name is not required
         
         # Test valid email
         result = await _validate_field_value("email", "valid@email.com")
-        assert result["valid"] == True
+        assert result["valid"]
         
         # Test valid phone with formatting
         result = await _validate_field_value("phone", "+1-555-123-4567")
-        assert result["valid"] == True
+        assert result["valid"]

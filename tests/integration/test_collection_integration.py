@@ -67,12 +67,12 @@ class TestCollectionWorkflow:
 
         # Step 3: Test union operation
         union_result = await collection_union(context, collection_id_1, collection_id_2)
-        union_collection_id = union_result["collection_id"]
+        union_result["collection_id"]
         assert union_result["count"] >= 0
 
         # Step 4: Test intersection
         intersect_result = await collection_intersect(context, collection_id_1, collection_id_2)
-        intersect_collection_id = intersect_result["collection_id"]
+        intersect_result["collection_id"]
         assert intersect_result["count"] >= 0
 
         print(f"Union: {union_result['count']}, Intersect: {intersect_result['count']}")
@@ -150,7 +150,7 @@ class TestCollectionWorkflow:
         diff_result = await collection_diff(context, large_result["collection_id"], small_result["collection_id"])
         
         # The difference should be the larger set minus the smaller set
-        expected_diff = large_result["count"] - len(set(range(small_result["count"])).intersection(set(range(large_result["count"]))))
+        large_result["count"] - len(set(range(small_result["count"])).intersection(set(range(large_result["count"]))))
         print(f"Large: {large_result['count']}, Small: {small_result['count']}, Diff: {diff_result['count']}")
 
     @pytest.mark.asyncio

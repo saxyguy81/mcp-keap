@@ -61,8 +61,7 @@ class TestAdvancedFieldOperations:
         # For demonstration, we'll use a single contact with dry run simulation
         collection_details = await get_collection_details(context, collection_id, fields=["id"], limit=1)
         if collection_details["contact_ids"]:
-            contact_id = str(collection_details["contact_ids"][0])
-            contact_values = {contact_id: "Integration test note"}
+            str(collection_details["contact_ids"][0])
             
             # Note: dry_run would be implemented in actual modify_collection_fields
             # For now, we'll test the signature without actually updating
@@ -138,12 +137,12 @@ class TestAdvancedTagOperations:
         
         # Create a small collection
         result = await list_contacts(context, limit=2)
-        collection_id = result["collection_id"]
+        result["collection_id"]
         
         # Get available tags
         tags_result = await get_tags(context, limit=3)
         if "tags" in tags_result and len(tags_result["tags"]) > 0:
-            tag_id = tags_result["tags"][0]["id"]
+            tags_result["tags"][0]["id"]
             
             # Test adding tags (modify_collection_tags doesn't have dry_run, so we skip actual execution)
             # modify_result = await modify_collection_tags(
@@ -165,7 +164,7 @@ class TestAdvancedTagOperations:
     @pytest.mark.asyncio
     async def test_create_and_delete_tag_workflow(self):
         """Test creating and then deleting a tag (full workflow)"""
-        context = Context()
+        Context()
         
         try:
             # Create a test tag
@@ -409,7 +408,7 @@ class TestOptimizationEngineIntegration:
                 fields=["email"]
             )
             
-            gmail_found = any(
+            any(
                 contact.get("email", "").endswith("@gmail.com") 
                 for contact in optimized_details["contacts"]
             )
@@ -442,8 +441,8 @@ class TestOptimizationEngineIntegration:
             
             # Should have contacts with both conditions met
             for contact in details["contacts"]:
-                given_name = contact.get("given_name", "").lower()
-                email = contact.get("email", "")
+                contact.get("given_name", "").lower()
+                contact.get("email", "")
                 
                 # At least one contact should meet the criteria
                 # (The actual filtering logic handles email_addresses array properly)

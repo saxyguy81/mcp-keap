@@ -219,11 +219,29 @@ def evaluate_filter_condition(
             return False
     elif operator == "in":
         if isinstance(filter_value, (list, tuple)):
-            return str(value).lower() in [str(v).lower() for v in filter_value]
+            # CRITICAL FIX: Handle numeric ID comparison properly
+            # For ID fields, use numeric comparison to avoid string/int mismatches
+            try:
+                # Try numeric comparison first (for IDs and numeric fields)
+                value_int = int(value)
+                target_ints = [int(v) for v in filter_value]
+                return value_int in target_ints
+            except (ValueError, TypeError):
+                # Fallback to string comparison for non-numeric fields
+                return str(value).lower() in [str(v).lower() for v in filter_value]
         return False
     elif operator == "not_in":
         if isinstance(filter_value, (list, tuple)):
-            return str(value).lower() not in [str(v).lower() for v in filter_value]
+            # CRITICAL FIX: Handle numeric ID comparison properly
+            # For ID fields, use numeric comparison to avoid string/int mismatches
+            try:
+                # Try numeric comparison first (for IDs and numeric fields)
+                value_int = int(value)
+                target_ints = [int(v) for v in filter_value]
+                return value_int not in target_ints
+            except (ValueError, TypeError):
+                # Fallback to string comparison for non-numeric fields
+                return str(value).lower() not in [str(v).lower() for v in filter_value]
         return True
     
     return False

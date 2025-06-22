@@ -61,7 +61,7 @@ class TestEmailFieldArchitecture:
             if email_addresses:
                 email_addresses_populated += 1
                 
-        print(f"\n📊 Architecture Analysis:")
+        print("\n📊 Architecture Analysis:")
         print(f"  Contacts with email field populated: {email_field_populated}/{len(contacts)}")
         print(f"  Contacts with email_addresses populated: {email_addresses_populated}/{len(contacts)}")
         
@@ -82,7 +82,7 @@ class TestEmailFieldArchitecture:
         context = Context()
         
         # Test server-side optimization with email filtering
-        print(f"\n🔍 Testing server-side email filtering (should find no results):")
+        print("\n🔍 Testing server-side email filtering (should find no results):")
         
         server_result = await list_contacts(
             context,
@@ -94,7 +94,7 @@ class TestEmailFieldArchitecture:
         print(f"Server-side email filtering result: {server_result['count']} contacts")
         
         # Test client-side filtering with email_addresses
-        print(f"\n🔍 Testing client-side email_addresses filtering:")
+        print("\n🔍 Testing client-side email_addresses filtering:")
         
         # Note: For proper email filtering, we should be using email_addresses field
         # But first let's test what our current implementation does
@@ -123,7 +123,7 @@ class TestEmailFieldArchitecture:
         """
         context = Context()
         
-        print(f"\n🔍 Testing proper email filtering with email_addresses field:")
+        print("\n🔍 Testing proper email filtering with email_addresses field:")
         
         # This is how email filtering should be done - targeting email_addresses
         # Note: This requires our filtering logic to understand email_addresses array
@@ -168,11 +168,11 @@ class TestEmailFieldArchitecture:
                 has_email_in_field = "@" in email_field
                 
                 if has_email_in_addresses:
-                    print(f"  ✅ Has email in email_addresses")
+                    print("  ✅ Has email in email_addresses")
                 elif has_email_in_field:
-                    print(f"  ✅ Has email in email field")
+                    print("  ✅ Has email in email field")
                 else:
-                    print(f"  ❌ No email found - filtering may be broken")
+                    print("  ❌ No email found - filtering may be broken")
                     
         assert result["count"] >= 0, "Email filtering should complete without error"
 
@@ -183,7 +183,7 @@ class TestEmailFieldArchitecture:
         """
         context = Context()
         
-        print(f"\n🔍 Checking contact schema for email field documentation:")
+        print("\n🔍 Checking contact schema for email field documentation:")
         
         schema = await get_contact_schema(context)
         
@@ -193,15 +193,15 @@ class TestEmailFieldArchitecture:
         email_field_info = fields.get("email")
         email_addresses_field_info = fields.get("email_addresses")
         
-        print(f"\nSchema information:")
+        print("\nSchema information:")
         print(f"  email field: {email_field_info}")
         print(f"  email_addresses field: {email_addresses_field_info}")
         
         # Check if schema properly documents the architecture
         if email_field_info:
-            print(f"  📋 email field is documented in schema")
+            print("  📋 email field is documented in schema")
         if email_addresses_field_info:
-            print(f"  📋 email_addresses field is documented in schema")
+            print("  📋 email_addresses field is documented in schema")
             
         # The schema should help users understand which field to use
         assert "email" in fields or "email_addresses" in fields, "Schema should document email fields"
@@ -214,7 +214,7 @@ class TestEmailFieldArchitecture:
         """
         context = Context()
         
-        print(f"\n🔍 Testing optimization engine email handling:")
+        print("\n🔍 Testing optimization engine email handling:")
         
         # Test that email filtering is now forced to client-side
         result = await list_contacts(
@@ -232,7 +232,7 @@ class TestEmailFieldArchitecture:
         server_side_filters = metrics.get("server_side_filters", 0)
         client_side_filters = metrics.get("client_side_filters", 0)
         
-        print(f"Optimization metrics:")
+        print("Optimization metrics:")
         print(f"  Server-side filters: {server_side_filters}")
         print(f"  Client-side filters: {client_side_filters}")
         

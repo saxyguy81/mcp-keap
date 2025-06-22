@@ -329,7 +329,7 @@ class TestMissingCoverageScenarios:
         # Verify consistency across results
         details_results = [r for r in results if "contacts" in r]
         count_results = [r for r in results if "count" in r and "contacts" not in r]
-        ids_results = [r for r in results if "contacts" in r and len(r.get("contacts", [])) > 0 and "id" in r["contacts"][0]]
+        [r for r in results if "contacts" in r and len(r.get("contacts", [])) > 0 and "id" in r["contacts"][0]]
         
         # All details results should have same count
         if details_results:

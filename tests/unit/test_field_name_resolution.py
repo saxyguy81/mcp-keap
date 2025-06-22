@@ -17,7 +17,7 @@ class TestCustomFieldManager:
         manager = CustomFieldManager()
         assert manager.field_definitions == {}
         assert manager.name_to_id_mapping == {}
-        assert manager.loaded == False
+        assert not manager.loaded
 
     def test_manual_field_setup(self):
         """Test manual field definition setup for testing"""

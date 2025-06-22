@@ -91,11 +91,21 @@ class QueryOptimizer:
         if not filters:
             return QueryStrategy.BULK_RETRIEVE
 
-        # Check for email filters - always use BULK_RETRIEVE for proper email_addresses handling
+        # Check for email filters - use SERVER_OPTIMIZED for exact matches, BULK_RETRIEVE for others
         email_filters = [f for f in filters if f.get("field") == "email"]
         if email_filters:
-            logger.debug("Email filters detected - using BULK_RETRIEVE for comprehensive email_addresses search")
-            return QueryStrategy.BULK_RETRIEVE
+            # Check if ALL email filters are exact matches (can be server-optimized)
+            all_exact_matches = all(
+                f.get("operator") in ["equals", "EQUALS"] 
+                for f in email_filters
+            )
+            
+            if all_exact_matches:
+                logger.debug("All email filters are exact matches - allowing SERVER_OPTIMIZED strategy")
+                # Continue to check server optimizability below
+            else:
+                logger.debug("Non-exact email filters detected - using BULK_RETRIEVE for comprehensive email_addresses search")
+                return QueryStrategy.BULK_RETRIEVE
 
         # Check for custom field filters - always use BULK_RETRIEVE for client-side processing
         custom_field_filters = [f for f in filters if f.get("field", "").startswith("custom_fields.")]
@@ -126,10 +136,9 @@ class QueryOptimizer:
     def _count_server_optimizable_filters(self, filters: List[Dict[str, Any]]) -> int:
         """Count filters that can be optimized server-side.
         
-        Note: Email filters are NOT server-optimizable because emails are stored
-        in email_addresses array, not the direct email field.
+        Updated: Email filters with EXACT matches (equals operator) can be server-optimized.
+        Wildcard email patterns must still use client-side processing.
         """
-        # Email is removed from server_fields because it requires client-side processing
         server_fields = {"given_name", "family_name", "id", "date_created"}
         server_operators = {"EQUALS", "CONTAINS", "equals", "contains"}
 
@@ -138,9 +147,11 @@ class QueryOptimizer:
             field = filter_condition.get("field", "")
             operator = filter_condition.get("operator", "")
             
-            # Email filters always require client-side processing
+            # Special handling for email filters - only exact matches can be server-optimized
             if field == "email":
-                continue
+                if operator in ["equals", "EQUALS"]:
+                    count += 1  # Exact email matches can be server-optimized
+                continue  # Other email operators (contains, etc.) remain client-side
             
             # Custom fields require client-side processing
             if field.startswith("custom_fields."):
@@ -361,13 +372,20 @@ class QueryExecutor:
             value = filter_item.get("value", "")
             
             # Map filters to API parameters
-            # CRITICAL: email field filtering is ALWAYS done client-side due to architectural limitations:
-            # - email field can be null while email_addresses array has data
-            # - Server-side filtering on email field is incomplete and unreliable
-            # - Client-side filtering checks both email field AND email_addresses array
+            # CRITICAL: Email filtering optimization strategy based on testing:
+            # - Server-side filtering ONLY works for exact email matches (equals operator)
+            # - Wildcard patterns (*@gmail.com*) don't work server-side 
+            # - Contains/partial matches must be done client-side
+            # - Server-side exact matches are much faster when we know the exact email
             if field == "email":
-                # Force email filtering to client-side (NEVER optimize to server-side)
-                client_filters.append(filter_item)
+                if operator == "equals":
+                    # OPTIMIZATION: Use server-side for exact email matches (proven to work)
+                    server_params["email"] = value
+                    logger.info(f"Optimizing exact email match '{value}' to server-side")
+                else:
+                    # Force non-exact email filtering to client-side (wildcards don't work server-side)
+                    client_filters.append(filter_item)
+                    logger.info(f"Using client-side for email {operator} '{value}' (server-side doesn't support wildcards)")
             elif field == "given_name" and operator == "contains":
                 server_params["given_name"] = f"*{value}*"
             elif field == "given_name" and operator == "equals":
@@ -514,8 +532,8 @@ class QueryExecutor:
         matching_contacts = []
         searched_contact_ids = set()
         
-        # Search strategy: Get a larger sample from different parts of the database
-        search_batch_size = max(500, limit * 3)  # Search more than requested
+        # Search strategy: Get a larger sample using optimal API batch size
+        search_batch_size = max(1000, limit * 3)  # Use API maximum (1000) for efficiency
         
         # First pass: Get contacts from the beginning (newest)
         response1 = await self.api_client.get_contacts(
@@ -557,33 +575,58 @@ class QueryExecutor:
                         if len(matching_contacts) >= limit:
                             return matching_contacts[:limit]
         
-        # Third pass: If still need more matches, search additional batches
+        # Third pass: EXHAUSTIVE PAGINATION - search ALL remaining contacts
         if len(matching_contacts) < limit:
-            additional_batches = 3  # Search a few more batches
+            logger.info(f"Starting exhaustive search from offset {search_batch_size}")
             
-            for batch_num in range(additional_batches):
-                batch_offset = search_batch_size + (batch_num * 200)
+            # Continue searching until we reach the end of data or find enough matches
+            batch_size = 1000  # Maximum API limit for optimal efficiency
+            current_offset = search_batch_size
+            max_total_contacts = 50000  # Safety limit
+            total_searched = search_batch_size
+            
+            while (len(matching_contacts) < limit and 
+                   total_searched < max_total_contacts):
                 
-                response_batch = await self.api_client.get_contacts(
-                    limit=200,
-                    offset=batch_offset,
-                    include_custom_fields=True,
-                    include_tags=True
-                )
-                contacts_batch = response_batch.get("contacts", [])
-                
-                if not contacts_batch:
-                    break  # No more contacts
-                
-                for contact in contacts_batch:
-                    contact['email'] = _extract_email(contact)
-                    if _contact_matches_filters(contact, filters):
-                        if contact['id'] not in searched_contact_ids:
-                            matching_contacts.append(contact)
-                            searched_contact_ids.add(contact['id'])
-                            
-                            if len(matching_contacts) >= limit:
-                                return matching_contacts[:limit]
+                try:
+                    response_batch = await self.api_client.get_contacts(
+                        limit=batch_size,
+                        offset=current_offset,
+                        include_custom_fields=True,
+                        include_tags=True
+                    )
+                    contacts_batch = response_batch.get("contacts", [])
+                    
+                    if not contacts_batch:
+                        logger.info(f"Reached end of database at offset {current_offset}")
+                        break  # No more contacts
+                    
+                    total_searched += len(contacts_batch)
+                    
+                    # Log progress every 5 batches
+                    batch_num = (current_offset - search_batch_size) // batch_size + 1
+                    if batch_num % 5 == 1:
+                        logger.info(f"Exhaustive batch {batch_num}: {len(contacts_batch)} contacts from offset {current_offset}")
+                    
+                    for contact in contacts_batch:
+                        contact['email'] = _extract_email(contact)
+                        if _contact_matches_filters(contact, filters):
+                            if contact['id'] not in searched_contact_ids:
+                                matching_contacts.append(contact)
+                                searched_contact_ids.add(contact['id'])
+                                
+                                if len(matching_contacts) >= limit:
+                                    logger.info(f"Found {len(matching_contacts)} matches after searching {total_searched} total contacts")
+                                    return matching_contacts[:limit]
+                    
+                    current_offset += batch_size
+                    
+                except Exception as e:
+                    logger.error(f"Error in exhaustive batch at offset {current_offset}: {e}")
+                    current_offset += batch_size
+                    continue
+            
+            logger.info(f"Exhaustive search complete: {total_searched} total contacts searched")
         
         return matching_contacts[:limit]
 

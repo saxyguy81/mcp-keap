@@ -49,28 +49,52 @@ The Keap MCP Server uses a collection-based, high-performance architecture:
 
 ## MCP Tools
 
-The server exposes **11 streamlined MCP tools** using a collection-based architecture:
+The server exposes **13 streamlined MCP tools** using a collection-based architecture:
 
 ### Core Contact Operations (2 tools)
-1. **`list_contacts`** - Universal search with field name-based filters, returns collection ID
+1. **`list_contacts`** - Universal search with comprehensive filters (supports JSON strings & Python lists), returns collection ID. Default limit: 1000 contacts (API maximum)
 2. **`get_contact_schema`** - Get available fields, custom fields, and usage patterns
 
 ### Collection Operations (4 tools)  
-3. **`collection_union`** - Combine two collections (A ∪ B)
-4. **`collection_intersect`** - Find contacts in both collections (A ∩ B)
-5. **`collection_diff`** - Find contacts in first but not second collection (A - B)
-6. **`collection_count`** - Get collection size without fetching data
+3. **`collection_union`** - Combine multiple collections (A ∪ B ∪ C...)
+4. **`collection_intersect`** - Find contacts present in all collections (A ∩ B ∩ C...)
+5. **`collection_diff`** - Find contacts in first but not in other collections (A - B - C...)
+6. **`create_collection_from_ids`** - Create collection from list of contact IDs
 
-### Collection Data Access (2 tools)
-7. **`get_collection_details`** - Fetch contact data with field selection from collection
-8. **`get_collection_ids`** - Get raw contact ID list from collection
+### Collection Data Access (3 tools)
+7. **`get_collection_details`** - Fetch contact data with comprehensive field selection from collection
+8. **`get_collection_fields`** - Get specific field values for contacts in collection
+9. **`set_collection_fields`** - Bulk update specific fields for contacts in collection
 
 ### Tag Operations (2 tools)
-9. **`get_tags`** - List available tags with optional filtering
-10. **`apply_tags_to_collection`** - Bulk tag operations on contact collections
+10. **`get_tags`** - List available tags with optional filtering
+11. **`modify_collection_tags`** - Bulk tag operations (add/remove) on contact collections
+
+### Field Operations (1 tool)
+12. **`modify_contact_fields`** - Bulk update specific fields across contacts with individual values
 
 ### System Operations (1 tool)
-11. **`get_api_diagnostics`** - Comprehensive API diagnostics and performance metrics
+13. **`get_api_diagnostics`** - Comprehensive API diagnostics and performance metrics
+
+## Key Features
+
+### JSON String & Python List Support
+The `list_contacts` tool now accepts filters in both formats for maximum compatibility:
+- **Python List**: `[{"field": "given_name", "operator": "equals", "value": "Scott"}]`
+- **JSON String**: `'[{"field": "given_name", "operator": "equals", "value": "Scott"}]'`
+
+### Comprehensive Field Selection
+Use `get_collection_details` with flexible field selection:
+- **All fields**: `fields=None` (default)
+- **Standard fields**: `fields=["given_name", "family_name", "email_addresses", "company"]`
+- **Custom fields**: `fields=["custom_field_7", "6FN Next Date/Time"]`
+- **Mixed fields**: `fields=["id", "given_name", "custom_field_7"]`
+- **ID only**: `fields=["id"]` (most efficient)
+
+### Performance Optimization
+- **Default 1000 limit**: Get maximum contacts per request by default
+- **Intelligent caching**: Reduces API calls with SQLite-based persistence
+- **Collection-based operations**: Minimize data transfer for bulk operations
 
 ## Getting Started
 

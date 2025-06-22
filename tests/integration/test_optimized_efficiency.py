@@ -71,7 +71,6 @@ class TestOptimizedEfficiency:
         
         # Test field filtering worked
         for contact in contacts:
-            expected_fields = {"id", "given_name", "family_name", "custom_fields"}
             actual_fields = set(contact.keys())
             # Should only have the requested fields (plus any API adds)
             assert "id" in actual_fields

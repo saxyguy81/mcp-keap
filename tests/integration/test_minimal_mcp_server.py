@@ -233,7 +233,6 @@ class TestMinimalMCPServer:
         # Test that we can import the server without any import errors
         try:
             from src.mcp.server import KeapMCPServer
-            from fastmcp import FastMCP
             
             # Test that server can be created (this tests import dependencies)
             with patch("src.api.client.KeapApiService"), \

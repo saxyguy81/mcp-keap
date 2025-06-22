@@ -24,11 +24,8 @@ from src.mcp.tools_collections import (
     get_collection_details,
     get_collection_fields,
     collection_union,
-    collection_intersect,
     get_api_diagnostics,
     get_contact_schema,
-    modify_collection_tags,
-    get_tags,
 )
 from src.mcp.server import KeapMCPServer
 

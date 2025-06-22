@@ -14,28 +14,32 @@ The Keap MCP service provides a streamlined interface for interacting with Keap 
 
 ## MCP Tools Overview
 
-The server exposes **11 streamlined MCP tools**:
+The server exposes **13 streamlined MCP tools**:
 
 ### Core Contact Operations (2 tools)
-1. **`list_contacts`** - Universal search with field name-based filters
-2. **`get_contact_schema`** - Get available fields and usage patterns
+1. **`list_contacts`** - Universal search with comprehensive filters (JSON strings & Python lists supported). Default limit: 1000 contacts
+2. **`get_contact_schema`** - Get available fields, custom fields, and usage patterns
 
 ### Collection Operations (4 tools)  
-3. **`collection_union`** - Combine two collections (A ∪ B)
-4. **`collection_intersect`** - Find contacts in both collections (A ∩ B)
-5. **`collection_diff`** - Find contacts in first but not second collection (A - B)
-6. **`collection_count`** - Get collection size without fetching data
+3. **`collection_union`** - Combine multiple collections (A ∪ B ∪ C...)
+4. **`collection_intersect`** - Find contacts present in all collections (A ∩ B ∩ C...)
+5. **`collection_diff`** - Find contacts in first but not in other collections (A - B - C...)
+6. **`create_collection_from_ids`** - Create collection from list of contact IDs
 
-### Collection Data Access (2 tools)
-7. **`get_collection_details`** - Fetch contact data from collection
-8. **`get_collection_ids`** - Get raw contact ID list from collection
+### Collection Data Access (3 tools)
+7. **`get_collection_details`** - Fetch contact data with comprehensive field selection from collection
+8. **`get_collection_fields`** - Get specific field values for contacts in collection
+9. **`set_collection_fields`** - Bulk update specific fields for contacts in collection
 
 ### Tag Operations (2 tools)
-9. **`get_tags`** - List available tags with optional filtering
-10. **`apply_tags_to_collection`** - Bulk tag operations on collections
+10. **`get_tags`** - List available tags with optional filtering
+11. **`modify_collection_tags`** - Bulk tag operations (add/remove) on contact collections
+
+### Field Operations (1 tool)
+12. **`modify_contact_fields`** - Bulk update specific fields across contacts with individual values
 
 ### System Operations (1 tool)
-11. **`get_api_diagnostics`** - Comprehensive API diagnostics
+13. **`get_api_diagnostics`** - Comprehensive API diagnostics and performance metrics
 
 ---
 
@@ -44,12 +48,13 @@ The server exposes **11 streamlined MCP tools**:
 ### 1. list_contacts
 
 Universal contact search that returns a collection ID for further operations.
+**Supports both JSON string and Python list formats for maximum MCP client compatibility.**
 
 #### Parameters
 
 ```json
 {
-  "filters": [
+  "filters": [                     // Can be JSON string or Python list
     {
       "field": "string",           // Field name (preferred) 
       "field_id": "string",        // Explicit field ID (alternative)
@@ -57,7 +62,7 @@ Universal contact search that returns a collection ID for further operations.
       "value": "any"
     }
   ],
-  "limit": 200,
+  "limit": 1000,                   // Default: 1000 (API maximum)
   "offset": 0,
   "order_by": "string",
   "order_direction": "ASC|DESC",
@@ -80,15 +85,31 @@ Universal contact search that returns a collection ID for further operations.
 #### Example Usage
 
 ```python
-# Search by field name (preferred)
+# Python list format (direct API calls)
+result = await list_contacts(
+    context=context,
+    filters=[
+        {"field": "given_name", "operator": "equals", "value": "Scott"}
+    ],
+    limit=50
+)
+# Returns: {"collection_id": "contacts_abc123", "count": 11}
+
+# JSON string format (MCP client compatibility)
+result = await list_contacts(
+    context=context,
+    filters='[{"field": "given_name", "operator": "equals", "value": "Scott"}]',
+    limit=50
+)
+# Returns same result as above
+
+# Search by custom field name (preferred)
 result = await list_contacts(
     context=context,
     filters=[
         {"field": "6FN Next Date/Time", "operator": "is_not_null", "value": ""}
-    ],
-    limit=50
+    ]
 )
-# Returns: {"collection_id": "contacts_abc123", "count": 12}
 
 # Search by explicit field ID
 result = await list_contacts(
@@ -98,15 +119,18 @@ result = await list_contacts(
     ]
 )
 
-# Complex multi-criteria search
+# Complex multi-criteria search (JSON string format)
 result = await list_contacts(
     context=context,
-    filters=[
-        {"field": "email", "operator": "contains", "value": "@company.com"},
-        {"field": "tags", "operator": "contains", "value": "VIP"},
-        {"field": "Member Expire Date", "operator": "after", "value": "2024-01-01"}
-    ]
+    filters='[{"field": "email", "operator": "contains", "value": "@company.com"}, {"field": "tags", "operator": "contains", "value": "VIP"}]'
 )
+
+# Default limit gets 1000 contacts (API maximum)
+result = await list_contacts(
+    context=context,
+    filters=[{"field": "email", "operator": "contains", "value": "@gmail.com"}]
+)
+# Returns up to 1000 contacts by default
 ```
 
 ### 2. get_contact_schema
