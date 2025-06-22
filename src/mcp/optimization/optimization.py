@@ -363,10 +363,16 @@ class QueryExecutor:
             # Map email filters to API parameters
             if field == "email" and operator == "contains":
                 server_params["email"] = f"*{value}*"
+            elif field == "email" and operator == "equals":
+                server_params["email"] = value
             elif field == "given_name" and operator == "contains":
                 server_params["given_name"] = f"*{value}*"
+            elif field == "given_name" and operator == "equals":
+                server_params["given_name"] = value
             elif field == "family_name" and operator == "contains":
                 server_params["family_name"] = f"*{value}*"
+            elif field == "family_name" and operator == "equals":
+                server_params["family_name"] = value
             else:
                 # Keep for client-side filtering
                 client_filters.append(filter_item)

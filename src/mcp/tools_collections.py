@@ -186,7 +186,8 @@ class CustomFieldManager:
         except Exception as e:
             logger.error(f"Failed to load field definitions: {e}")
         finally:
-            await api_client.close()
+            # api_client is now a singleton - no need to close
+            pass
     
     def get_field_name(self, field_id: int) -> str:
         """Get field name from field ID"""
@@ -391,30 +392,46 @@ async def _validate_field_value(field_name: str, value: Any, require_timezone: b
     }
 
 
-# Initialize shared components
+# Initialize shared components with singleton pattern for accurate diagnostics
+
+# Global singleton instances
+_api_client = None
+_cache_manager = None
+
 def get_api_client() -> KeapApiService:
-    """Get or create API client instance."""
-    import os
+    """Get or create API client instance (singleton for accurate diagnostics)."""
+    global _api_client
+    
+    if _api_client is None:
+        import os
 
-    # Debug: Write API key status to a debug file
-    try:
-        api_key = os.getenv("KEAP_API_KEY")
-        with open("/tmp/keap_debug.log", "a") as f:
-            f.write(f"API Key status: {'Found' if api_key else 'Missing'} - {api_key[:20] if api_key else 'None'}...\n")
-            f.write(f"Working directory: {os.getcwd()}\n")
-            f.write(f"Environment vars: {list(os.environ.keys())}\n")
-    except Exception:
-        pass
+        # Debug: Write API key status to a debug file
+        try:
+            api_key = os.getenv("KEAP_API_KEY")
+            with open("/tmp/keap_debug.log", "a") as f:
+                f.write(f"API Key status: {'Found' if api_key else 'Missing'} - {api_key[:20] if api_key else 'None'}...\n")
+                f.write(f"Working directory: {os.getcwd()}\n")
+                f.write(f"Environment vars: {list(os.environ.keys())}\n")
+        except Exception:
+            pass
 
-    # For testing, provide a default API key if none exists
-    if not os.getenv("KEAP_API_KEY"):
-        os.environ["KEAP_API_KEY"] = "test_api_key_for_testing"
-    return KeapApiService()
+        # For testing, provide a default API key if none exists
+        if not os.getenv("KEAP_API_KEY"):
+            os.environ["KEAP_API_KEY"] = "test_api_key_for_testing"
+        
+        _api_client = KeapApiService()
+    
+    return _api_client
 
 
 def get_cache_manager() -> CacheManager:
-    """Get or create cache manager instance."""
-    return CacheManager()
+    """Get or create cache manager instance (singleton for accurate diagnostics)."""
+    global _cache_manager
+    
+    if _cache_manager is None:
+        _cache_manager = CacheManager()
+    
+    return _cache_manager
 
 
 # Core Contact Operations
@@ -551,8 +568,7 @@ async def list_contacts(
     except Exception as e:
         logger.error(f"Error in list_contacts: {e}")
         raise
-    finally:
-        await api_client.close()
+    # Note: api_client is now a singleton - no need to close
 
 
 async def get_contact_schema(context: Context) -> Dict[str, Any]:
@@ -639,8 +655,7 @@ async def get_contact_schema(context: Context) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error in get_contact_schema: {e}")
         raise
-    finally:
-        await api_client.close()
+    # Note: api_client is now a singleton - no need to close
 
 
 # Collection Operations
@@ -1060,7 +1075,8 @@ async def get_collection_details(
         logger.error(f"Error in get_collection_details: {e}")
         raise
     finally:
-        await api_client.close()
+        # api_client is now a singleton - no need to close
+        pass
 
 
 # REMOVED: get_collection_ids - Use get_collection_details(fields=["id"]) instead
@@ -1105,7 +1121,8 @@ async def get_tags(
         logger.error(f"Error in get_tags: {e}")
         raise
     finally:
-        await api_client.close()
+        # api_client is now a singleton - no need to close
+        pass
 
 
 async def modify_collection_tags(
@@ -1227,7 +1244,8 @@ async def modify_collection_tags(
         logger.error(f"Error in apply_tags_to_collection: {e}")
         raise
     finally:
-        await api_client.close()
+        # api_client is now a singleton - no need to close
+        pass
 
 
 # System Operations
@@ -1799,7 +1817,8 @@ async def get_collection_fields(
         logger.error(f"Error in get_fields_for_collection: {e}")
         raise
     finally:
-        await api_client.close()
+        # api_client is now a singleton - no need to close
+        pass
 
 
 async def set_collection_fields(
@@ -1916,7 +1935,8 @@ async def set_collection_fields(
         logger.error(f"Error in set_fields_for_collection: {e}")
         raise
     finally:
-        await api_client.close()
+        # api_client is now a singleton - no need to close
+        pass
 
 
 async def modify_contact_fields(
@@ -2040,7 +2060,8 @@ async def modify_contact_fields(
         logger.error(f"Error in set_field_for_contacts: {e}")
         raise
     finally:
-        await api_client.close()
+        # api_client is now a singleton - no need to close
+        pass
 
 
 # REMOVED: Duplicate modify_collection_tags function - Use the one at line 1019 instead
@@ -2133,7 +2154,7 @@ async def modify_contact_fields(
 #         logger.error(f"Error in modify_collection_tags: {e}")
 #         raise
 #     finally:
-#         await api_client.close()
+# # api_client is now a singleton - no need to close
 
 
 async def get_tag_details(
@@ -2218,7 +2239,8 @@ async def get_tag_details(
         logger.error(f"Error in get_tag_details: {e}")
         raise
     finally:
-        await api_client.close()
+        # api_client is now a singleton - no need to close
+        pass
 
 
 async def modify_tags(
@@ -2337,7 +2359,8 @@ async def modify_tags(
         logger.error(f"Error in modify_tags: {e}")
         raise
     finally:
-        await api_client.close()
+        # api_client is now a singleton - no need to close
+        pass
 
 
 async def create_tags(
@@ -2425,7 +2448,8 @@ async def create_tags(
         logger.error(f"Error in create_tags: {e}")
         raise
     finally:
-        await api_client.close()
+        # api_client is now a singleton - no need to close
+        pass
 
 
 async def delete_tags(
@@ -2516,7 +2540,8 @@ async def delete_tags(
         logger.error(f"Error in delete_tags: {e}")
         raise
     finally:
-        await api_client.close()
+        # api_client is now a singleton - no need to close
+        pass
 
 
 # Helper functions for enhanced API functionality
@@ -2690,7 +2715,7 @@ async def delete_tags_mcp(
 #         return result
 #         
 #     finally:
-#         await api_client.close()
+# # api_client is now a singleton - no need to close
 
 
 # REMOVED: get_contact_custom_fields_by_name - Use get_collection_details instead
@@ -2730,6 +2755,6 @@ async def delete_tags_mcp(
 #         }
 #         
 #     finally:
-#         await api_client.close()
+# # api_client is now a singleton - no need to close
 
 
