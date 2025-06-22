@@ -6,7 +6,6 @@ with real API calls to verify performance improvements and optimization strategi
 """
 
 import pytest
-import asyncio
 import os
 from mcp.server.fastmcp import Context
 

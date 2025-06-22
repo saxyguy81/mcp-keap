@@ -7,9 +7,8 @@ including field management, tag operations, and optimization.
 """
 
 import logging
-import json
 import asyncio
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional
 from datetime import datetime, timezone
 import time
 
@@ -395,7 +394,7 @@ def get_api_client() -> KeapApiService:
             f.write(f"API Key status: {'Found' if api_key else 'Missing'} - {api_key[:20] if api_key else 'None'}...\n")
             f.write(f"Working directory: {os.getcwd()}\n")
             f.write(f"Environment vars: {list(os.environ.keys())}\n")
-    except:
+    except Exception:
         pass
 
     # For testing, provide a default API key if none exists
@@ -511,7 +510,7 @@ async def list_contacts(
         # Create collection
         collection_id = collection_manager.create_collection(
             contact_ids=contact_ids,
-            name=f"Search results",
+            name="Search results",
             description=f"Contacts matching filters: {filters}"
         )
         
@@ -1056,7 +1055,7 @@ async def modify_collection_tags(
                 contact_id_strs = [str(cid) for cid in contact_ids]
                 tag_id_strs = [str(tid) for tid in tag_ids]
                 
-                bulk_result = await api_client.apply_tags_to_contacts(tag_id_strs, contact_id_strs)
+                await api_client.apply_tags_to_contacts(tag_id_strs, contact_id_strs)
                 logger.info(f"Applied {len(tag_ids)} tags to {len(contact_ids)} contacts using bulk API")
                 
                 # Create success results for all combinations
@@ -1923,78 +1922,78 @@ async def modify_contact_fields(
 #     Returns:
 #         Dict with operation results and optional metrics
 #     """
-    
-    try:
-        start_time = time.time()
-        contact_ids = collection_manager.get_contact_ids(collection_id)
-        if not contact_ids:
-            raise ValueError(f"Collection {collection_id} not found or expired")
-        
-        results = []
-        api_calls_made = 0
-        
-        # Process tag operations for each contact
-        for contact_id in contact_ids:
-            for tag_id in tag_ids:
-                try:
-                    if operation == "add":
-                        await api_client.apply_tag_to_contact(str(contact_id), tag_id)
-                    elif operation == "remove":
-                        await api_client.remove_tag_from_contact(str(contact_id), tag_id)
-                    elif operation == "replace":
-                        # For replace, would need to get current tags and manage accordingly
-                        # Simplified implementation - just add the tags
-                        await api_client.apply_tag_to_contact(str(contact_id), tag_id)
-                    else:
-                        raise ValueError(f"Invalid operation: {operation}")
-                    
-                    api_calls_made += 1
-                    results.append({
-                        "contact_id": contact_id,
-                        "tag_id": tag_id,
-                        "operation": operation,
-                        "status": "success"
-                    })
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to {operation} tag {tag_id} for contact {contact_id}: {e}")
-                    results.append({
-                        "contact_id": contact_id,
-                        "tag_id": tag_id,
-                        "operation": operation,
-                        "status": "failed",
-                        "error": str(e)
-                    })
-        
-        successful = sum(1 for r in results if r["status"] == "success")
-        
-        result = {
-            "collection_id": collection_id,
-            "operation": operation,
-            "tag_ids": tag_ids,
-            "total_operations": len(results),
-            "successful": successful,
-            "failed": len(results) - successful,
-            "results": results
-        }
-        
-        # Add performance metrics
-        if return_metrics:
-            duration_ms = (time.time() - start_time) * 1000
-            result["performance_metrics"] = {
-                "total_duration_ms": duration_ms,
-                "api_calls": api_calls_made,
-                "contacts_processed": len(contact_ids),
-                "tags_processed": len(tag_ids)
-            }
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"Error in modify_collection_tags: {e}")
-        raise
-    finally:
-        await api_client.close()
+#     
+#     try:
+#         start_time = time.time()
+#         contact_ids = collection_manager.get_contact_ids(collection_id)
+#         if not contact_ids:
+#             raise ValueError(f"Collection {collection_id} not found or expired")
+#         
+#         results = []
+#         api_calls_made = 0
+#         
+#         # Process tag operations for each contact
+#         for contact_id in contact_ids:
+#             for tag_id in tag_ids:
+#                 try:
+#                     if operation == "add":
+#                         await api_client.apply_tag_to_contact(str(contact_id), tag_id)
+#                     elif operation == "remove":
+#                         await api_client.remove_tag_from_contact(str(contact_id), tag_id)
+#                     elif operation == "replace":
+#                         # For replace, would need to get current tags and manage accordingly
+#                         # Simplified implementation - just add the tags
+#                         await api_client.apply_tag_to_contact(str(contact_id), tag_id)
+#                     else:
+#                         raise ValueError(f"Invalid operation: {operation}")
+#                     
+#                     api_calls_made += 1
+#                     results.append({
+#                         "contact_id": contact_id,
+#                         "tag_id": tag_id,
+#                         "operation": operation,
+#                         "status": "success"
+#                     })
+#                     
+#                 except Exception as e:
+#                     logger.warning(f"Failed to {operation} tag {tag_id} for contact {contact_id}: {e}")
+#                     results.append({
+#                         "contact_id": contact_id,
+#                         "tag_id": tag_id,
+#                         "operation": operation,
+#                         "status": "failed",
+#                         "error": str(e)
+#                     })
+#         
+#         successful = sum(1 for r in results if r["status"] == "success")
+#         
+#         result = {
+#             "collection_id": collection_id,
+#             "operation": operation,
+#             "tag_ids": tag_ids,
+#             "total_operations": len(results),
+#             "successful": successful,
+#             "failed": len(results) - successful,
+#             "results": results
+#         }
+#         
+#         # Add performance metrics
+#         if return_metrics:
+#             duration_ms = (time.time() - start_time) * 1000
+#             result["performance_metrics"] = {
+#                 "total_duration_ms": duration_ms,
+#                 "api_calls": api_calls_made,
+#                 "contacts_processed": len(contact_ids),
+#                 "tags_processed": len(tag_ids)
+#             }
+#         
+#         return result
+#         
+#     except Exception as e:
+#         logger.error(f"Error in modify_collection_tags: {e}")
+#         raise
+#     finally:
+#         await api_client.close()
 
 
 async def get_tag_details(
@@ -2423,9 +2422,7 @@ async def _validate_field_value(
     }
 
 
-def get_api_client():
-    """Factory function to get API client without context dependency."""
-    return KeapApiService()
+# get_api_client function is defined above at line 386
 
 
 # Context-dependent wrapper functions for MCP tools

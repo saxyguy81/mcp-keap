@@ -10,7 +10,7 @@ Tests the core collection management functionality including:
 
 import pytest
 import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from src.cache.collections import CollectionManager, Collection, get_collection_manager
 

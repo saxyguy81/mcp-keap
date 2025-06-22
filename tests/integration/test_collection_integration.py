@@ -16,8 +16,7 @@ from src.mcp.tools_collections import (
     collection_union,
     collection_intersect,
     collection_diff,
-    get_collection_details,
-    modify_collection_tags
+    get_collection_details
 )
 from src.cache.collections import get_collection_manager
 
@@ -181,7 +180,6 @@ class TestCollectionPersistence:
     @pytest.mark.asyncio
     async def test_collection_cleanup(self, context, skip_if_no_api_key):
         """Test collection TTL and cleanup"""
-        import time
         
         collection_manager = get_collection_manager()
         collection_manager.collections.clear()

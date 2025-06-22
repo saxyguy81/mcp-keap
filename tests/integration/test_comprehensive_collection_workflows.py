@@ -18,8 +18,6 @@ from src.mcp.tools_collections import (
     collection_intersect,
     collection_diff,
     get_collection_details,  # Replaces collection_count and get_collection_ids
-    get_tags,
-    modify_collection_tags,
     get_api_diagnostics
 )
 from src.cache.collections import get_collection_manager

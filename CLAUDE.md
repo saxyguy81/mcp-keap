@@ -61,13 +61,52 @@
 
 ## Development Process
 
-1. **Always check integration test coverage** before completing features
-2. **Run coverage validation**: `pytest tests/integration/ --cov=src --cov-report=term-missing`
-3. **Maintain 70%+ integration coverage** at all times
-4. **Add integration tests** for any new collection functionality
-5. **Test end-to-end workflows** not just individual components
+### **MANDATORY Code Quality Requirements**
+1. **All code MUST pass comprehensive linting before checkin**
+   - **Run lint check**: `make lint` (must pass with 0 errors)
+   - **Auto-fix issues**: `make lint-fix` 
+   - **Format code**: `make format`
+   - **Type check**: `make type-check`
+   - **Security check**: `make security`
+
+2. **Pre-commit Requirements**
+   - **MANDATORY**: Run `make pre-commit` before every commit
+   - **MANDATORY**: All lint errors must be fixed before commits are allowed
+   - **MANDATORY**: Code must be properly formatted (ruff format)
+   - **MANDATORY**: Unit tests must pass
+
+### **Testing Requirements**
+3. **Always check integration test coverage** before completing features
+4. **Run coverage validation**: `pytest tests/integration/ --cov=src --cov-report=term-missing`
+5. **Maintain 70%+ integration coverage** at all times
+6. **Add integration tests** for any new collection functionality
+7. **Test end-to-end workflows** not just individual components
 
 ## Commands
+
+### **Mandatory Code Quality Commands:**
+```bash
+# REQUIRED: Pre-commit check (auto-fixes + tests)
+make pre-commit
+
+# REQUIRED: Comprehensive linting (no fixes)
+make lint
+
+# Auto-fix lint issues
+make lint-fix
+
+# Format code  
+make format
+
+# Type checking
+make type-check
+
+# Security analysis
+make security
+
+# Full quality assurance
+make qa
+```
 
 ### Test Coverage Check:
 ```bash

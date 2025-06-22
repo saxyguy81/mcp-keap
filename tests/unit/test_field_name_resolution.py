@@ -6,7 +6,6 @@ without requiring API calls.
 """
 
 import pytest
-from unittest.mock import Mock, AsyncMock
 from src.mcp.tools_collections import CustomFieldManager, get_field_manager, _resolve_custom_field_names_in_filters
 
 

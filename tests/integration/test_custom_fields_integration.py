@@ -9,7 +9,6 @@ import pytest
 import os
 from unittest.mock import patch, AsyncMock
 
-from src.api.client import KeapApiService
 from src.mcp.tools_collections import list_contacts, get_collection_details, get_contact_schema
 from mcp.server.fastmcp import Context
 

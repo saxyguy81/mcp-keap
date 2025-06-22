@@ -4,10 +4,6 @@ Unit tests for core tools_collections functions.
 Tests critical helper functions and utilities without requiring API calls.
 """
 
-import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime
-from typing import Dict, List, Any
 
 from src.mcp.tools_collections import (
     _normalize_email,

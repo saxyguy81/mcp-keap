@@ -10,18 +10,13 @@ import asyncio
 from mcp.server.fastmcp import Context
 
 from src.mcp.tools_collections import (
-    modify_contact_fields,
-    set_collection_fields,
-    modify_collection_tags,
     get_tags,
     get_tag_details,
-    modify_tags,
     create_tags,
     delete_tags,
     list_contacts,
     collection_union,
     get_collection_details,
-    get_collection_fields,
     get_api_diagnostics
 )
 

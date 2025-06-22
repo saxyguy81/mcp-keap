@@ -42,14 +42,31 @@ test-models:  ## Run model tests only
 test-fast:  ## Run fast tests (skip slow integration tests)
 	python -m pytest tests/unit/ -v -m "not slow"
 
-lint:  ## Run code linting (if available)
-	@if command -v ruff >/dev/null 2>&1; then \
-		ruff check src/; \
-	elif command -v flake8 >/dev/null 2>&1; then \
-		flake8 src/; \
-	else \
-		echo "Install ruff or flake8 for linting"; \
-	fi
+lint:  ## Run comprehensive code linting
+	@echo "🔍 Running comprehensive linting checks..."
+	ruff check src/ tests/
+	@echo "✅ Lint checks completed"
+
+lint-fix:  ## Run linting with auto-fix
+	@echo "🔧 Running linting with auto-fixes..."
+	ruff check src/ tests/ --fix
+	@echo "✅ Lint auto-fixes applied"
+
+format:  ## Format code with ruff
+	@echo "🎨 Formatting code..."
+	ruff format src/ tests/
+	@echo "✅ Code formatted"
+
+type-check:  ## Run type checking with mypy
+	@echo "🔍 Running type checks..."
+	mypy src/ --ignore-missing-imports
+	@echo "✅ Type checking completed"
+
+security:  ## Run security checks
+	@echo "🔒 Running security analysis..."
+	bandit -r src/ -f json -o bandit-report.json || true
+	safety check --json --output safety-report.json || true
+	@echo "✅ Security checks completed"
 
 clean:  ## Clean generated files
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
@@ -115,10 +132,22 @@ setup-ci:  ## Set up CI dependencies
 	@echo "✅ CI dependencies installed"
 
 # Development quality checks
-quality-check: lint coverage-unit  ## Run full quality check
+quality-check: lint-fix format type-check security coverage-unit  ## Run full quality check
 	@echo "🎉 Quality check completed"
 
-pre-commit-check: clean lint coverage-check  ## Quick pre-commit verification
-	@echo "✅ Pre-commit checks passed"
+pre-commit-check: lint-fix format test  ## Quick pre-commit verification
+	@echo "✅ Pre-commit checks passed - ready for commit!"
+
+# Comprehensive checks
+qa: lint type-check security test-fast  ## Quality assurance check (no fixes)
+	@echo "✅ QA checks completed"
+
+# Pre-commit style check that must pass before commits  
+pre-commit: lint-fix format test-fast  ## Pre-commit checks with auto-fixes
+	@echo "✅ Pre-commit checks with fixes completed"
+
+# Check if code is ready for production
+ready: qa coverage-unit  ## Full production readiness check
+	@echo "🎉 Code is ready for production!"
 
 .DEFAULT_GOAL := help

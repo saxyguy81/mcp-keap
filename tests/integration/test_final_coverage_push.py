@@ -14,13 +14,8 @@ from src.mcp.tools_collections import (
     get_contact_schema,
     get_collection_details,
     collection_union,
-    collection_intersect,
-    collection_diff,
     get_tags,
     modify_collection_tags,
-    get_api_diagnostics,
-    # Helper functions
-    _is_datetime_field,
     _convert_datetime_value,
     _normalize_datetime_value,
     get_api_client

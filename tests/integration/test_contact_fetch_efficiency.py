@@ -8,7 +8,6 @@ Focuses on core performance characteristics without extensive exploration.
 import pytest
 import os
 import time
-from unittest.mock import patch, AsyncMock
 
 from src.mcp.tools_collections import list_contacts, get_collection_details
 from mcp.server.fastmcp import Context

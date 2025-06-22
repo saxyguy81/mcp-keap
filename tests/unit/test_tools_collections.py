@@ -25,9 +25,6 @@ from src.mcp.tools_collections import (
     get_tags,
     modify_collection_tags,
     get_api_diagnostics,
-    modify_contact_fields,
-    set_collection_fields,
-    get_collection_fields,
     _apply_filters,
     _contact_matches_filters,
     _field_matches_condition

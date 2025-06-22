@@ -19,8 +19,7 @@ from src.mcp.tools_collections import (
     get_collection_details,
     get_tags,
     modify_collection_tags,
-    get_api_diagnostics,
-    modify_contact_fields
+    get_api_diagnostics
 )
 
 

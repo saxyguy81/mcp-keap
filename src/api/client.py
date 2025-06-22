@@ -554,7 +554,7 @@ class KeapApiService:
                 # Try v2 API if available
                 try:
                     if self.api_version == "v2":
-                        result = await self.delete(f"/tags/{tag_id}")
+                        await self.delete(f"/tags/{tag_id}")
                     else:
                         # Try v2 API with explicit URL
                         v2_url = self.base_url.replace("/v1", "/v2")
@@ -563,7 +563,7 @@ class KeapApiService:
                         # Create temporary session with v2 base URL
                         try:
                             self.session.base_url = v2_url
-                            result = await self.delete(f"/tags/{tag_id}")
+                            await self.delete(f"/tags/{tag_id}")
                         finally:
                             # Restore original base URL
                             self.session.base_url = original_session_base
@@ -623,16 +623,22 @@ class KeapApiService:
             
             # Format 5: POST to specific tag endpoint (direct assignment)
             try:
-                response = await self.post(f"/contacts/{contact_id}/tags/{tag_id_int}", {})
+                await self.post(f"/contacts/{contact_id}/tags/{tag_id_int}", {})
                 return {"contact_id": contact_id, "tag_id": tag_id_int, "applied": True, "method": "POST_direct"}
             except Exception as e5:
                 logger.debug(f"POST direct method failed: {e5}")
             
             # If all methods fail, raise the most informative error
+            errors = {
+                "PUT": locals().get('e1', 'Not attempted'),
+                "POST_tagIds": locals().get('e2', 'Not attempted'),
+                "POST_tag_id": locals().get('e3', 'Not attempted'), 
+                "POST_id": locals().get('e4', 'Not attempted'),
+                "POST_direct": locals().get('e5', 'Not attempted')
+            }
             raise RuntimeError(
                 f"Failed to apply tag {tag_id} to contact {contact_id}. "
-                f"All API formats attempted. Last errors: PUT: {e1}, POST_tagIds: {e2}, "
-                f"POST_tag_id: {e3}, POST_id: {e4}, POST_direct: {e5}"
+                f"All API formats attempted. Errors: {errors}"
             )
 
     async def remove_tag_from_contact(

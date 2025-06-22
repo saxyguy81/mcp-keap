@@ -471,7 +471,6 @@ class QueryExecutor:
         **kwargs,
     ) -> Tuple[List[Dict[str, Any]], int, int, int]:
         """Execute with bulk retrieval and client-side filtering."""
-        from src.mcp.tools_collections import _extract_email, _contact_matches_filters
 
         if query_type == "list_contacts":
             # Enhanced contact retrieval to ensure we don't miss contacts

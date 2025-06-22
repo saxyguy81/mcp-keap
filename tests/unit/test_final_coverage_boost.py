@@ -5,7 +5,7 @@ Targets specific uncovered lines in key modules.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 from src.mcp.optimization.api_optimization import ApiParameterOptimizer
 from src.mcp.optimization.optimization import QueryOptimizer, QueryStrategy

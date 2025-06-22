@@ -12,19 +12,9 @@ import os
 from mcp.server.fastmcp import Context
 
 from src.mcp.tools_collections import (
-    list_contacts,
-    get_contact_schema,
-    collection_union,
-    collection_intersect,
-    collection_diff,
-    get_collection_details,
-    get_tags,
-    modify_collection_tags,
-    get_api_diagnostics
+    get_contact_schema
 )
-from src.cache.collections import get_collection_manager, CollectionManager
-from src.api.client import KeapApiService
-from src.cache.manager import CacheManager
+from src.cache.collections import CollectionManager
 
 
 @pytest.fixture
@@ -197,7 +187,6 @@ class TestRealSchemaDiscovery:
     async def test_contact_schema_structure(self, context):
         """Test real contact schema discovery structure"""
         # This tests the actual schema discovery logic without mocking
-        from src.mcp.tools_collections import get_contact_schema
         
         # Create a temporary API client for schema discovery
         # We'll use environment variables if available, otherwise skip
@@ -242,7 +231,7 @@ class TestRealFilteringLogic:
 
     def test_filter_matching_logic(self, sample_contact_data):
         """Test real contact filtering logic"""
-        from src.mcp.tools_collections import _apply_filters, _contact_matches_filters, _field_matches_condition
+        from src.mcp.tools_collections import _apply_filters
         
         # Test simple equals filter
         filters = [{"field": "given_name", "operator": "equals", "value": "John"}]

@@ -8,7 +8,7 @@ including wildcard support, complex filters, and optimization.
 import re
 import logging
 from datetime import datetime
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)
 

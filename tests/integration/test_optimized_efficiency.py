@@ -3,7 +3,6 @@ Test the optimized collection details fetching efficiency.
 """
 
 import pytest
-import asyncio
 import time
 from mcp.server.fastmcp import Context
 from src.mcp.tools_collections import list_contacts, get_collection_details
@@ -40,7 +39,7 @@ class TestOptimizedEfficiency:
         
         contacts = details.get("contacts", [])
         
-        print(f"Optimized results:")
+        print("Optimized results:")
         print(f"  Contacts retrieved: {len(contacts)}")
         print(f"  Time taken: {end_time - start_time:.2f} seconds")
         
@@ -95,7 +94,7 @@ class TestOptimizedEfficiency:
         
         contacts = details.get("contacts", [])
         
-        print(f"Small collection results:")
+        print("Small collection results:")
         print(f"  Contacts retrieved: {len(contacts)}")
         print(f"  Time taken: {end_time - start_time:.2f} seconds")
         
@@ -119,7 +118,7 @@ class TestOptimizedEfficiency:
         optimized_time = time.time() - start_time
         optimized_contacts = optimized_details.get("contacts", [])
         
-        print(f"Optimized approach:")
+        print("Optimized approach:")
         print(f"  Contacts: {len(optimized_contacts)}")
         print(f"  Time: {optimized_time:.2f} seconds")
         
@@ -127,7 +126,7 @@ class TestOptimizedEfficiency:
         # Based on our test results: ~1.25 seconds per individual API call
         simulated_old_time = len(optimized_contacts) * 1.25
         
-        print(f"Simulated old O(n) approach:")
+        print("Simulated old O(n) approach:")
         print(f"  Contacts: {len(optimized_contacts)}")
         print(f"  Estimated time: {simulated_old_time:.2f} seconds")
         
@@ -157,15 +156,15 @@ class TestOptimizedEfficiency:
         for improvement in improvements:
             print(f"  {improvement}")
         
-        print(f"\nBefore optimization:")
-        print(f"  - Made 1 API call per contact (O(n) complexity)")
-        print(f"  - 5 contacts = 5 API calls = ~6+ seconds")
-        print(f"  - Custom fields were included but inefficiently")
+        print("\nBefore optimization:")
+        print("  - Made 1 API call per contact (O(n) complexity)")
+        print("  - 5 contacts = 5 API calls = ~6+ seconds")
+        print("  - Custom fields were included but inefficiently")
         
-        print(f"\nAfter optimization:")
-        print(f"  - Makes ~1-3 API calls total (O(1) to O(log n) complexity)")
-        print(f"  - 5 contacts = ~1-2 API calls = ~1-3 seconds") 
-        print(f"  - Custom fields included efficiently in batch calls")
-        print(f"  - Early termination when all contacts found")
+        print("\nAfter optimization:")
+        print("  - Makes ~1-3 API calls total (O(1) to O(log n) complexity)")
+        print("  - 5 contacts = ~1-2 API calls = ~1-3 seconds") 
+        print("  - Custom fields included efficiently in batch calls")
+        print("  - Early termination when all contacts found")
         
         assert True  # This test always passes, it's informational
