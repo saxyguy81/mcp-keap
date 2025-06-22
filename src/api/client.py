@@ -509,6 +509,27 @@ class KeapApiService:
             )
             return {"success": False, "error": str(e)}
 
+    async def delete_contact(self, contact_id: str) -> Dict[str, Any]:
+        """Delete a contact by ID"""
+        try:
+            # Use DELETE method to remove the contact
+            await self.delete(f"/contacts/{contact_id}")
+            
+            # Keap API may return empty response for successful deletion
+            return {
+                "success": True,
+                "contact_id": contact_id,
+                "message": "Contact deleted successfully"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error deleting contact {contact_id}: {e}")
+            return {
+                "success": False,
+                "contact_id": contact_id,
+                "error": str(e)
+            }
+
     # Tag Methods
     async def get_tags(self, limit: int = 1000, offset: int = 0) -> Dict[str, Any]:
         """Get tags with enhanced caching and diagnostics"""

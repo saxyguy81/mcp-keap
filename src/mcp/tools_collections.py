@@ -1499,6 +1499,167 @@ async def modify_collection_tags(
         pass
 
 
+# Contact Deletion Operations
+async def delete_collection_contacts(
+    context: Context,
+    collection_id: str,
+    confirm_deletion: bool = False,
+    dry_run: bool = True,
+    return_metrics: bool = False
+) -> Dict[str, Any]:
+    """Delete all contacts in a specific collection.
+    
+    WARNING: This is a destructive operation that permanently deletes contacts.
+    Use with extreme caution and always test with dry_run=True first.
+    
+    Args:
+        context: MCP context
+        collection_id: Collection identifier from list_contacts()
+        confirm_deletion: Must be True to actually delete contacts (safety check)
+        dry_run: If True, only shows what would be deleted without actually deleting
+        return_metrics: Include performance metrics in response
+        
+    Returns:
+        Dict with deletion results and metrics
+        
+    Examples:
+        # Preview what would be deleted (safe)
+        delete_collection_contacts("contacts_abc123", dry_run=True)
+        
+        # Actually delete all contacts (dangerous!)
+        delete_collection_contacts("contacts_abc123", confirm_deletion=True, dry_run=False)
+    """
+    collection_manager = get_collection_manager()
+    api_client = get_api_client()
+    
+    start_time = time.time()
+    
+    try:
+        # Get contact IDs from collection
+        contact_ids = collection_manager.get_contact_ids(collection_id)
+        if not contact_ids:
+            return {
+                "success": True,
+                "collection_id": collection_id,
+                "contacts_to_delete": 0,
+                "deleted_count": 0,
+                "message": "Collection is empty - no contacts to delete",
+                "dry_run": dry_run
+            }
+        
+        total_contacts = len(contact_ids)
+        
+        # Safety checks
+        if not dry_run and not confirm_deletion:
+            return {
+                "success": False,
+                "error": "Safety check failed: confirm_deletion must be True for actual deletion",
+                "collection_id": collection_id,
+                "contacts_to_delete": total_contacts,
+                "dry_run": dry_run,
+                "message": "Set confirm_deletion=True and dry_run=False to actually delete contacts"
+            }
+        
+        # Get sample contact details for preview
+        sample_contacts = []
+        if total_contacts > 0:
+            # Get details for first 3 contacts as preview
+            for contact_id in contact_ids[:min(3, total_contacts)]:
+                try:
+                    contact = await api_client.get_contact(str(contact_id))
+                    sample_contacts.append({
+                        "id": contact.get("id"),
+                        "name": f"{contact.get('given_name', '')} {contact.get('family_name', '')}".strip(),
+                        "email": contact.get("email", ""),
+                        "date_created": contact.get("date_created", "")
+                    })
+                except Exception as e:
+                    logger.warning(f"Could not get details for contact {contact_id}: {e}")
+        
+        if dry_run:
+            # Dry run - just return what would be deleted
+            return {
+                "success": True,
+                "collection_id": collection_id,
+                "contacts_to_delete": total_contacts,
+                "deleted_count": 0,
+                "dry_run": True,
+                "message": f"DRY RUN: Would delete {total_contacts} contacts",
+                "sample_contacts": sample_contacts,
+                "contact_ids": contact_ids[:10] if total_contacts <= 10 else contact_ids[:10] + ["..."],
+                "warning": "This is a preview only. Set dry_run=False to actually delete contacts."
+            }
+        
+        # Actual deletion
+        deleted_count = 0
+        failed_deletions = []
+        successful_deletions = []
+        
+        logger.warning(f"Starting deletion of {total_contacts} contacts from collection {collection_id}")
+        
+        for i, contact_id in enumerate(contact_ids):
+            try:
+                result = await api_client.delete_contact(str(contact_id))
+                
+                if result.get("success", False):
+                    deleted_count += 1
+                    successful_deletions.append(contact_id)
+                    logger.info(f"Deleted contact {contact_id} ({i+1}/{total_contacts})")
+                else:
+                    failed_deletions.append({
+                        "contact_id": contact_id,
+                        "error": result.get("error", "Unknown error")
+                    })
+                    logger.error(f"Failed to delete contact {contact_id}: {result.get('error')}")
+                
+                # Add small delay to avoid overwhelming the API
+                if i > 0 and i % 10 == 0:
+                    await asyncio.sleep(0.1)
+                    
+            except Exception as e:
+                failed_deletions.append({
+                    "contact_id": contact_id,
+                    "error": str(e)
+                })
+                logger.error(f"Exception deleting contact {contact_id}: {e}")
+        
+        # Delete the collection since contacts are deleted
+        if deleted_count > 0:
+            try:
+                collection_manager.delete_collection(collection_id)
+            except Exception as e:
+                logger.warning(f"Could not delete collection {collection_id}: {e}")
+        
+        result = {
+            "success": True,
+            "collection_id": collection_id,
+            "contacts_to_delete": total_contacts,
+            "deleted_count": deleted_count,
+            "failed_count": len(failed_deletions),
+            "dry_run": False,
+            "message": f"Deleted {deleted_count} of {total_contacts} contacts",
+            "successful_deletions": successful_deletions[:10] if len(successful_deletions) <= 10 else successful_deletions[:10] + ["..."],
+            "failed_deletions": failed_deletions[:5]  # Show first 5 failures
+        }
+        
+        if return_metrics:
+            duration = time.time() - start_time
+            result["metrics"] = {
+                "total_duration_seconds": duration,
+                "contacts_per_second": deleted_count / duration if duration > 0 else 0,
+                "api_calls_made": total_contacts  # One call per contact
+            }
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in delete_collection_contacts: {e}")
+        raise
+    finally:
+        # api_client is now a singleton - no need to close
+        pass
+
+
 # System Operations
 async def get_api_diagnostics(context: Context) -> Dict[str, Any]:
     """Get comprehensive API diagnostics and performance metrics."""

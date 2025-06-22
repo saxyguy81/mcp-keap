@@ -64,7 +64,7 @@ class KeapMCPServer:
         self._register_resources()
 
     def _register_tools(self):
-        """Register the 13 streamlined collection-based MCP tools.
+        """Register the 14 streamlined collection-based MCP tools.
         
         Tools Summary:
         - Core Contact Operations (2): list_contacts, get_contact_schema  
@@ -72,6 +72,7 @@ class KeapMCPServer:
         - Collection Data Access (3): get_collection_details, get_collection_fields, set_collection_fields
         - Tag Operations (2): get_tags, modify_collection_tags
         - Field Operations (1): modify_contact_fields
+        - Contact Deletion Operations (1): delete_collection_contacts
         - System Operations (1): get_api_diagnostics
         
         Features:
@@ -383,6 +384,38 @@ class KeapMCPServer:
 
             context = Context()
             return await _modify_fields(context, collection_id, field_name, contact_values)
+
+        # Contact Deletion Operations (1 tool)
+        @self.mcp.tool()
+        async def delete_collection_contacts(
+            collection_id: str, 
+            confirm_deletion: bool = False, 
+            dry_run: bool = True, 
+            return_metrics: bool = False
+        ):
+            """Delete all contacts in a specific collection.
+            
+            WARNING: This is a destructive operation that permanently deletes contacts.
+            Use with extreme caution and always test with dry_run=True first.
+            
+            Args:
+                collection_id: Collection identifier from list_contacts()
+                confirm_deletion: Must be True to actually delete contacts (safety check)
+                dry_run: If True, only shows what would be deleted without actually deleting
+                return_metrics: Include performance metrics in response
+                
+            Examples:
+                # Preview what would be deleted (safe)
+                delete_collection_contacts("contacts_abc123", dry_run=True)
+                
+                # Actually delete all contacts (dangerous!)
+                delete_collection_contacts("contacts_abc123", confirm_deletion=True, dry_run=False)
+            """
+            from src.mcp.tools_collections import delete_collection_contacts as _delete_contacts
+            from mcp.server.fastmcp import Context
+
+            context = Context()
+            return await _delete_contacts(context, collection_id, confirm_deletion, dry_run, return_metrics)
 
         # System Operations (1 tool)
         @self.mcp.tool()
