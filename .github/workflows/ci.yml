@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, grid, linux-x64, light]
     name: Lint Code
     
     steps:
@@ -42,7 +42,7 @@ jobs:
         ruff format --check .
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, grid, linux-x64, heavy]
     strategy:
       matrix:
         python-version: ['3.10', '3.11']
@@ -93,7 +93,7 @@ jobs:
         fail_ci_if_error: false
 
   security:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, grid, linux-x64, light]
     name: Security Scan
     
     steps:
@@ -121,7 +121,7 @@ jobs:
         safety check
 
   type-check:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, grid, linux-x64, light]
     name: Type Check
     
     steps:
@@ -145,7 +145,7 @@ jobs:
       continue-on-error: true  # Don't fail CI on type errors for now
 
   build-test:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, grid, linux-x64, heavy]
     name: Build and Import Test
     needs: [lint, test]
     
@@ -206,7 +206,7 @@ jobs:
         "
 
   coverage-report:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, grid, linux-x64, heavy]
     name: Generate Coverage Report
     needs: [test]
     if: github.event_name == 'pull_request'
